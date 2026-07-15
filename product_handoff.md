@@ -555,7 +555,7 @@
 6. ~~"设置"角标内部具体内容~~（v4 补充梳理已确定，见 6.2.1）。UI 呈现形式（弹层列表 vs 独立页面）仍未定
 7. **小程序后端代理的具体技术形态**：微信云函数 vs 自建 Node 服务，留待生产阶段评估
 8. ~~图鉴层/丰容探索 tab 的实现状态~~（v8.1 核实已全部实现，见 §12.5；遗留落差见 §12.6）
-9. **上线前必须处理（用户侧操作，非代码）**：①微信公众平台 request 合法域名白名单（Qwen 对话域名）；②隐私政策正式文本替换（~~订阅消息模板 ID~~ 已随 remove-reminder-entry 移出产品，2026-07-10）
+9. **上线前必须处理（用户侧操作，非代码）**：①微信公众平台 request 合法域名白名单（Qwen 对话域名）；②隐私政策正式文本替换；③**主动提醒三项（2026-07-15 随 add-subscribe-reminder 回归**，翻案 remove-reminder-entry——订阅号群发无法定人定时，公众号只作宣传阵地）：云函数 `reminder` 部署 + 确认定时触发器生效（config.json 已带 cron 每 5 分钟）、订阅消息模板已选用（「日报提醒」ID `5iN18vOutpDx96b5DiVK00lZOF2uSgmXJFwUvviMC9Q`，代码里已写死，换模板需同步 cloudfunctions/reminder 与 src/api/reminder.js 两处）、小程序后台"用户隐私保护指引"补 openid 收集条目（与 NavBar.vue 隐私文本第五条一致）
 10. ~~**（add-diary-trace-system 新增，v8.5）手记页（完整时间轴翻阅面）**~~ **（已落地，add-diary-notebook，2026-07-10）**：手记册翻阅面已实现——首页右上角"有页才出现"的入口 → 全屏月跨页画册（横向 swiper 一屏一月，无页月份不产生跨页），卡片以照片作卡面、界面任何位置无计数，点卡片以全册时间线为上下文打开 TracePage 并可跨月连续翻页。原定约束全部落地：册页式陈列（非 feed）、无空格子（月粒度 + 月份列表只列有页的月，无日网格）、导航只做跳转不做打卡墙、防流水账（"无实质不成页"由摘要端天然限流，不加人工频率上限）。详见 `openspec/changes/add-diary-notebook/`（proposal / design / specs）
 11.5 **（add-share-cards 新增，v8.6）分享卡生产阶段升级**：①静态太阳码 PNG（小程序后台生成，填入 `ShareCardPreview.vue` 的 `SUNCODE_IMAGE`，当前为占位环）；②代理就绪后换 `getwxacodeunlimit` 带 scene 渠道参数，并同期评估分享事件 analytics 上报；③H5 端保存体验（当前为浏览器下载，仅开发用）
 11. **（add-diary-trace-system 新增，v8.5）照片 storage 预算与淘汰策略**：~~约 20 张照片撞 `conversations` 单 key 1MB 上限~~ **单 key 雷已拆除（2026-07-12，照片外置层）**：`storage.js` 在写入时把 conversations 消息图与 completionSummaries 缩略图的 base64 抽成独立 `img:` 键（内容寻址，同图两处引用共一键、自动去重），读取透明还原——业务代码零改动、旧数据零迁移（内嵌旧图读取兼容，下次写入自然外置）。**仍留待观察的**：微信 storage 总量 10MB 上限（约 190 张照片封顶），真机跑一段时间后实测增速，届时再决策淘汰策略或云存储（随生产代理一起）

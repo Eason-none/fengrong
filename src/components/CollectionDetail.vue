@@ -96,6 +96,7 @@ import ChatView from '@/components/ChatView.vue'
 import TracePage from '@/components/TracePage.vue'
 import CompletionBeat from '@/components/CompletionBeat.vue'
 import FirstTimeHint from '@/components/FirstTimeHint.vue'
+import { maybeSilentTopup } from '@/utils/silentTopup.js'
 
 const TYPE_LABELS = { perception: '感知', event: '事件' }
 
@@ -196,6 +197,7 @@ export default {
       this.step = 'card'
     },
     markDone() {
+      maybeSilentTopup() // 静默攒提醒额度（有守卫，绝不弹窗；见 utils/silentTopup.js）
       // previous_summary要在创建本次CompletionEvent之前取——否则查到的是"本次"而不是"上次"。
       this.previousSummary = getLatestSummaryForContent(this.selectedItem.id)?.summary_text ?? null
       this.completionEventId = createCompletionEvent({

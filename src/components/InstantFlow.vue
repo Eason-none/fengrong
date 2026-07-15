@@ -80,6 +80,7 @@ import { getBasicInfo } from '@/state/basicInfo.js'
 import { inferMomentScenes, preferMomentCandidates } from '@/state/momentInference.js'
 import { createCompletionEvent, COMPLETION_INVITE_TEXT } from '@/state/completionEvent.js'
 import { createConversation, getConversationByCompletionEventId } from '@/state/conversation.js'
+import { maybeSilentTopup } from '@/utils/silentTopup.js'
 
 export default {
   name: 'InstantFlow',
@@ -157,6 +158,7 @@ export default {
     // 撕卡动画进行中不响应——正在飞走的卡不该被"做完"
     markDone() {
       if (this.swapPhase) return
+      maybeSilentTopup() // 静默攒提醒额度（有守卫，绝不弹窗；见 utils/silentTopup.js）
       const event = createCompletionEvent({
         contentId: this.task.id,
         contentType: 'daily_task',

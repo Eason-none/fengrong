@@ -86,6 +86,7 @@ import { generateSummaryText } from '@/api/deepseek.js'
 import { compressImageFile } from '@/utils/imageCompress.js'
 import FirstTimeHint from '@/components/FirstTimeHint.vue'
 import { hasSeenHint } from '@/state/onboardingHints.js'
+import { maybeSilentTopup } from '@/utils/silentTopup.js'
 
 // 一条消息最多带几张图：与 uni.chooseImage 单次选择上限一致（微信端上限 9）
 const MAX_IMAGES = 9
@@ -302,6 +303,7 @@ export default {
     async done() {
       if (this.finishing) return
       this.finishing = true
+      maybeSilentTopup() // 静默攒提醒额度（有守卫，绝不弹窗；见 utils/silentTopup.js）——"说完了"覆盖聊天/日记两类完成
       // 收尾文案至少停留1.2s（归档可能很快返回，不设下限会一闪而过），
       // 之后渐淡0.6s再关闭——离开的节奏和这句话的语气一致，不能"啪"地消失。
       const minDisplay = new Promise((r) => setTimeout(r, 1200))

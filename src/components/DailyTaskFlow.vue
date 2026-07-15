@@ -57,6 +57,7 @@ import FirstTimeHint from '@/components/FirstTimeHint.vue'
 import { completeTask, saveCompletedTask } from '@/state/dailyTaskPool.js'
 import { createCompletionEvent, COMPLETION_INVITE_TEXT } from '@/state/completionEvent.js'
 import { createConversation, getConversationByCompletionEventId } from '@/state/conversation.js'
+import { maybeSilentTopup } from '@/utils/silentTopup.js'
 
 export default {
   name: 'DailyTaskFlow',
@@ -88,6 +89,7 @@ export default {
   },
   methods: {
     markDone() {
+      maybeSilentTopup() // 静默攒提醒额度（有守卫，绝不弹窗；见 utils/silentTopup.js）
       completeTask(this.task.id)
       const event = createCompletionEvent({
         contentId: this.task.id,

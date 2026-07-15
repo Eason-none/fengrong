@@ -1,0 +1,9 @@
+{
+	"name": "reminder",
+	"version": "1.0.0",
+	"description": "主动提醒：订阅记录管理（前端调用）+ 定时扫描发送订阅消息（触发器调用），单函数双入口",
+	"main": "index.js",
+	"dependencies": {
+		"wx-server-sdk": "~2.6.3"
+	}
+}
