@@ -23,7 +23,7 @@
           <!-- 已开启且未暂停：不需要弹窗，reject 锁死也不影响本态 -->
           <template v-if="reminder.enabled && !reminder.paused">
             <text class="reminder-pane__note">每天这个时间，轻轻提一句。</text>
-            <picker mode="time" :value="pickedTime" @change="onTimeChange">
+            <picker mode="multiSelector" :range="timeColumns" :value="pickerIndexes" @change="onTimeChange">
               <view class="reminder-pane__time">每天 {{ reminder.time }}<text class="reminder-pane__time-edit">改时间</text></view>
             </picker>
             <view class="reminder-pane__off" hover-class="u-press" @tap="turnOffReminder">关闭提醒</view>
@@ -42,7 +42,7 @@
           <!-- 未开启 -->
           <template v-else>
             <text class="reminder-pane__note">选一个时间，每天这时候提一句：给自己留几分钟。</text>
-            <picker mode="time" :value="pickedTime" @change="onTimeChange">
+            <picker mode="multiSelector" :range="timeColumns" :value="pickerIndexes" @change="onTimeChange">
               <view class="reminder-pane__time">{{ pickedTime }}<text class="reminder-pane__time-edit">改时间</text></view>
             </picker>
             <view class="reminder-pane__btn" hover-class="u-press" @tap="enableReminder">开启提醒</view>
@@ -122,6 +122,17 @@ export default {
       if (!this.reminder.enabled) return ''
       return this.reminder.paused ? '已暂停' : `每天 ${this.reminder.time}`
     },
+    // 时间选择用双列自定义选择器（时 × 5分钟档）：微信 picker mode="time" 固定 1 分钟颗粒度，
+    // 与发送侧 5 分钟窗口不匹配，会让用户以为 9:16 就该 9:16 整送达
+    timeColumns() {
+      const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0') + ' 时')
+      const minutes = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0') + ' 分')
+      return [hours, minutes]
+    },
+    pickerIndexes() {
+      const [h, m] = this.pickedTime.split(':').map(Number)
+      return [h, Math.min(Math.round(m / 5), 11)]
+    },
   },
   mounted() {
     // #ifdef MP-WEIXIN
@@ -191,7 +202,8 @@ export default {
       // #endif
     },
     onTimeChange(e) {
-      const time = e.detail.value
+      const [hi, mi] = e.detail.value
+      const time = `${String(hi).padStart(2, '0')}:${String(mi * 5).padStart(2, '0')}`
       this.pickedTime = time
       // #ifdef MP-WEIXIN
       // 已开启时改时间直接落服务端（不需要新弹窗，额度与时间解耦）
