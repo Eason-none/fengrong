@@ -41,7 +41,7 @@
           </template>
           <!-- 未开启 -->
           <template v-else>
-            <text class="reminder-pane__note">选一个时间，每天这时候提一句：给自己留几分钟。</text>
+            <text class="reminder-pane__note">选一个时间，每天这时候提一句：记得留一些时间探索世界哦~</text>
             <picker mode="multiSelector" :range="timeColumns" :value="pickerIndexes" @change="onTimeChange">
               <view class="reminder-pane__time">{{ pickedTime }}<text class="reminder-pane__time-edit">改时间</text></view>
             </picker>

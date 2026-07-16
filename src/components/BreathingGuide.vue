@@ -45,6 +45,8 @@
 </template>
 
 <script>
+import { maybeSilentTopup } from '@/utils/silentTopup.js'
+
 // 呼吸引导服务体验、不是流程门槛：「跳过」随时立即离开。「我准备好了」按 ui-flow.html 的
 // 4-7-8 引导跑两轮（吸气4s / 屏息7s / 呼气8s）后自动进入下一步——用 :style 绑定 + 定时器链
 // 复刻原型的圆圈缩放与阶段文字（小程序端不能像原型那样直接操作 DOM）。
@@ -143,6 +145,7 @@ export default {
     start() {
       if (this.started) return
       this.started = true
+      maybeSilentTopup() // 静默攒提醒额度（有守卫，绝不弹窗；见 utils/silentTopup.js）
       this.startAudio()
       this.hintActive = true
       this.hint = '使用能缓解焦虑的 4-7-8 呼吸法，准备好深呼吸了吗？'

@@ -63,7 +63,7 @@ getSetting({withSubscriptions: true})
 
 - 模板：「日报提醒」（日期 + 摘要），ID `5iN18vOutpDx96b5DiVK00lZOF2uSgmXJFwUvviMC9Q`
 - 字段键名（`date01`/`thing02` 之类）**由云函数自动解析**（实施期改进）：首次发送时调 `getTemplateList`，从模板 content 正则提取 date/thing 键并在容器实例内缓存——免人工核对，换模板只改 TEMPLATE_ID 一处（config.json permissions 需含 `subscribeMessage.getTemplateList`）
-- 摘要固定文案：「给自己留几分钟」；日期填当天
+- 摘要固定文案：「记得留一些时间探索世界哦~」（2026-07-16 用户定稿）；日期填当天
 - `page: 'pages/index/index'`，`miniprogramState` 按环境（体验版 trial / 正式 formal）
 
 ### D8. 设置页状态来源

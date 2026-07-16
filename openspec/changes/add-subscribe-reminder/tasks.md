@@ -24,6 +24,7 @@
 
 - [x] 4.1 `src/utils/silentTopup.js`：守卫态提前缓存（refreshSubscribeState，NavBar mounted 打底）+ tap 内同步判缓存再调 requestSubscribeMessage（异步 gap 会触发 iOS gesture fail，故不能 tap 内现查 getSetting）+ 异步 topup，全程无 UI
 - [x] 4.2 挂到四个完成 tap：DailyTaskFlow.markDone / InstantFlow.markDone（swapPhase 守卫后）/ CollectionDetail.markDone / ChatView.done（"说完了"，覆盖三件幸福小事与日记类对话），完成一拍不受影响
+- [x] 4.3 （2026-07-16 用户拍板"来过就续"）追加四个高频进入 tap：index.openThreeGoodThings（幸福小事入口）/ DailyCard.claim（领取）/ BreathingGuide.start（我准备好了）/ index.startInstant（现在就来一件）；同日文案定稿「记得留一些时间探索世界哦~」（云函数 SUMMARY_TEXT，**需重新部署云函数生效**）
 
 ## 5. 隐私与文档同步
 

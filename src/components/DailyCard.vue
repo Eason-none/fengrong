@@ -81,6 +81,7 @@
 <script>
 import { claimTask, getUncompletedTasks } from '@/state/dailyTaskPool.js'
 import { getDailyTaskCandidates } from '@/content/library.js'
+import { maybeSilentTopup } from '@/utils/silentTopup.js'
 
 function calcSurvivalDays(birthDate) {
   if (!birthDate) return null
@@ -149,6 +150,7 @@ export default {
   methods: {
     claim(task) {
       if (this.claimedIds.includes(task.id)) return
+      maybeSilentTopup() // 静默攒提醒额度（有守卫，绝不弹窗；见 utils/silentTopup.js）
       claimTask(task)
       this.claimedIds.push(task.id)
       this.$emit('claim', task)

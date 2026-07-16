@@ -214,6 +214,7 @@ import { getEnvironmentInfo } from '@/api/weather.js'
 import { getCompletionEvent } from '@/state/completionEvent.js'
 import { getDiaryPageForEvent, getSummaryPhotos } from '@/state/conversation.js'
 import { archiveChatOnExit } from '@/utils/archiveChatOnExit.js'
+import { maybeSilentTopup } from '@/utils/silentTopup.js'
 import { resolveTodayEntry, THREE_GOOD_THINGS_TITLE, THREE_GOOD_THINGS_SUMMARY_CONTEXT } from '@/state/threeGoodThings.js'
 import { buildThreeGoodThingsSystemPrompt } from '@/api/qwen.js'
 
@@ -574,6 +575,7 @@ export default {
       this.dailyFlow = { task, completionEventId: null, entry: 'detail' }
     },
     startInstant() {
+      maybeSilentTopup() // 同上：高频进入动作也续提醒额度（2026-07-16 用户拍板"来过就续"）
       this.instantActive = true
     },
     // 流程内产生完成事件（做完啦/移除）时刷新列表区块
@@ -596,6 +598,7 @@ export default {
     // 三件幸福小事：随时可记——点入口总是进对话（今天有未归档会话就续、否则开新的一段）。
     // 回看历史交给手记册，这里不再有"已归档只读重逢"分支（three-good-things）。
     openThreeGoodThings() {
+      maybeSilentTopup() // 静默攒提醒额度（有守卫，绝不弹窗；见 utils/silentTopup.js）
       const { conversationId } = resolveTodayEntry()
       this.threeGoodThingsConversationId = conversationId
       this.threeGoodThingsStep = 'chat'

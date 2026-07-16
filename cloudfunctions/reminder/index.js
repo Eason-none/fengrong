@@ -22,7 +22,7 @@ const _ = db.command
 const COLLECTION = 'reminders'
 
 const TEMPLATE_ID = '5iN18vOutpDx96b5DiVK00lZOF2uSgmXJFwUvviMC9Q' // 「日报提醒」：日期 + 摘要
-const SUMMARY_TEXT = '给自己留几分钟' // 固定一句轻声（grill 定稿：第二人称、不催不劝、无感叹号）
+const SUMMARY_TEXT = '记得留一些时间探索世界哦~' // 固定一句轻声（2026-07-16 用户定稿；≤20字、不催不劝）
 const LANDING_PAGE = 'pages/index/index' // 落首页，不预设意图
 // 体验版联调时在云函数控制台把环境变量 REMINDER_MP_STATE 设为 trial，正式版删掉即可
 const MINIPROGRAM_STATE = process.env.REMINDER_MP_STATE || 'formal'

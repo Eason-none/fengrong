@@ -14,7 +14,7 @@
 - **THEN** 不写入服务端记录，界面保持未开启状态，不出现任何挽留文案
 
 ### Requirement: 静默攒额度
-在「做完啦」与「存日记」的 tap 回调中，系统 SHALL 先经 `getSetting({withSubscriptions: true})` 检查：仅当 `mainSwitch === true` 且该模板 `itemSettings === 'accept'`（保证静默）且服务端存在 enabled 记录时，才调用 `requestSubscribeMessage` 并在返回 `accept` 后异步使额度 +1。整个过程 SHALL 无任何可见 UI；条件不满足时 SHALL 什么都不做——完成时刻绝不被弹窗打断。
+在**完成动作**（三处「做完啦」、聊天「说完了」）与**高频进入动作**（三件幸福小事入口、日推卡片「领取」、呼吸引导「我准备好了」、「现在就来一件」）的 tap 回调中（2026-07-16 用户拍板：续票语义从"做了才续"放宽为"来过就续"），系统 SHALL 先经 `getSetting({withSubscriptions: true})` 检查：仅当 `mainSwitch === true` 且该模板 `itemSettings === 'accept'`（保证静默）且服务端存在 enabled 记录时，才调用 `requestSubscribeMessage` 并在返回 `accept` 后异步使额度 +1（封顶 7）。整个过程 SHALL 无任何可见 UI；条件不满足时 SHALL 什么都不做——完成时刻绝不被弹窗打断。
 
 #### Scenario: 已勾"总是保持"的用户完成一条丰容
 - **WHEN** 用户点击「做完啦」且 getSetting 显示该模板为静默 accept 态
@@ -25,11 +25,11 @@
 - **THEN** 不调用 requestSubscribeMessage，无弹窗，完成一拍照常进行
 
 ### Requirement: 定时发送
-云函数定时触发器 SHALL 每 5 分钟扫描 `reminders` 集合，对满足 `enabled && quota > 0 && last_sent_date ≠ 今天（北京时间）` 且 `reminder_time` 落在 `(now-5min, now]` 窗口的记录发送订阅消息：日期字段填当天、摘要字段填固定文案「给自己留几分钟」、跳转页为小程序首页。发送成功 SHALL 使 `quota -1` 并记 `last_sent_date = 今天`。
+云函数定时触发器 SHALL 每 5 分钟扫描 `reminders` 集合，对满足 `enabled && quota > 0 && last_sent_date ≠ 今天（北京时间）` 且 `reminder_time` 落在 `(now-5min, now]` 窗口的记录发送订阅消息：日期字段填当天、摘要字段填固定文案「记得留一些时间探索世界哦~」、跳转页为小程序首页。发送成功 SHALL 使 `quota -1` 并记 `last_sent_date = 今天`。
 
 #### Scenario: 到点发送
 - **WHEN** 北京时间 21:03 触发器运行，某记录 reminder_time=21:00、quota=3、今天未发过
-- **THEN** 该用户收到服务通知「日报提醒 / 日期：今天 / 摘要：给自己留几分钟」，记录变为 quota=2、last_sent_date=今天
+- **THEN** 该用户收到服务通知「日报提醒 / 日期：今天 / 摘要：记得留一些时间探索世界哦~」，记录变为 quota=2、last_sent_date=今天
 
 #### Scenario: 同日不重发
 - **WHEN** 某记录今天已发送过（last_sent_date = 今天）
