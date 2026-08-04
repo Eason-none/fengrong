@@ -104,3 +104,12 @@ export function preferMoodCandidates(candidates, mood) {
 	if (!prefer.length) return candidates;
 	return [...prefer, ...candidates.filter((t) => !compatible(t))];
 }
+
+// 结构软优先（2026-08-04 内容审计）：即时入口优先曝光"换变量级"条目（熟悉载体×陌生变量），
+// 降低"感知重定级"占比。稳定分层、永不过滤：无 novelty=variable 候选时原样返回，不引入新空态。
+// 叠加位置：时刻推断之后、心情之前——心情是显式信号，权重最高，仍最后生效。
+export function preferNoveltyCandidates(candidates) {
+	const variable = candidates.filter((x) => x.novelty === "variable");
+	if (!variable.length) return candidates;
+	return [...variable, ...candidates.filter((x) => x.novelty !== "variable")];
+}

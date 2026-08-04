@@ -6,6 +6,7 @@ import {
 	inferMomentScenes,
 	preferMomentCandidates,
 	preferMoodCandidates,
+	preferNoveltyCandidates,
 	IN_PLACE_SCENES,
 	OUT_SCENES,
 } from "../src/state/momentInference.js";
@@ -135,5 +136,15 @@ const layered = preferMoodCandidates(
 // 时刻优先后 L2 在 L1 前；无聊层再把 B 类整体置前 → L2、L1、L3
 assert.deepEqual(layered.map((t) => t.id), ["L2", "L1", "L3"]);
 console.log("PASS 心情软优先");
+
+// 结构软优先（2026-08-04）：novelty=variable 置前；无 variable 原样返回；永不丢候选
+const novCands = [
+	{ id: "N1", novelty: "variable" },
+	{ id: "N2" },
+	{ id: "N3", novelty: "first" },
+];
+assert.deepEqual(preferNoveltyCandidates(novCands).map((t) => t.id), ["N1", "N2", "N3"]);
+assert.deepEqual(preferNoveltyCandidates(novCands.slice(1)).map((t) => t.id), ["N2", "N3"]);
+console.log("PASS 结构软优先（换变量级）");
 
 console.log("verify-momentInference: 全部通过");

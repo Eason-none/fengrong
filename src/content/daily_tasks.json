@@ -25,7 +25,8 @@
     "time": "10分钟",
     "instructions": "去一趟便利店，在你通常不会看的区域找一样东西买下来——可以是一种没喝过的饮料、一种奇怪口味的零食，或者一个不知道干什么用的小物件。",
     "scene_tags": ["convenience-store", "general"],
-    "gate0": "B"
+    "gate0": "B",
+    "novelty": "first"
   },
   {
     "id": "dt-006",
@@ -34,7 +35,8 @@
     "time": "午餐时间",
     "instructions": "今天去食堂吃饭的时候，不要坐惯常的位置，去找一个你没坐过的地方。观察从这个角度看食堂是什么感觉，有什么不同的景象。",
     "scene_tags": ["canteen"],
-    "gate0": "B"
+    "gate0": "B",
+    "novelty": "variable"
   },
   {
     "id": "dt-007",
@@ -52,7 +54,8 @@
     "time": "15分钟",
     "instructions": "今天去健身房的时候，找一台你通常不用的器械，花几分钟研究一下怎么用，然后试着用用看。不用追求效果，就是好奇心驱动。",
     "scene_tags": ["gym"],
-    "gate0": "B"
+    "gate0": "B",
+    "novelty": "first"
   },
   {
     "id": "dt-009",
@@ -61,7 +64,8 @@
     "time": "步行途中",
     "instructions": "今天步行的时候，在某个路口拐一个你平时不会拐的方向，多走一两分钟。不用有目的地，就是去看看那条路长什么样。",
     "scene_tags": ["walking"],
-    "gate0": "B"
+    "gate0": "B",
+    "novelty": "variable"
   },
   {
     "id": "dt-010",
@@ -70,7 +74,8 @@
     "time": "5分钟",
     "instructions": "在你的房间里环顾一圈，找一件放在「错误位置」的东西——一本你一直说要放回书架的书，一件衣服，一个空杯子……把它放到正确的地方。就这一件，不用整理全屋。",
     "scene_tags": ["home"],
-    "gate0": "B"
+    "gate0": "B",
+    "novelty": "variable"
   },
   {
     "id": "dt-011",
@@ -79,7 +84,8 @@
     "time": "驾车途中",
     "instructions": "今天开车的时候，不要放常听的歌单。打开音乐软件，随便选一个你没有点开过的歌单或专辑，就让它播。",
     "scene_tags": ["driving"],
-    "gate0": "B"
+    "gate0": "B",
+    "novelty": "variable"
   },
   {
     "id": "dt-012",
@@ -106,7 +112,8 @@
     "time": "随时",
     "instructions": "在今天的学习或工作中，找一个你一直有但没有搞明白的问题——关于课程内容、工作流程、或者就是你好奇的任何事——把它搞清楚。可以问人（对方答不答都行，把问题说出来本身就算完成），也可以自己搜。",
     "scene_tags": ["workspace", "classroom"],
-    "gate0": "B"
+    "gate0": "B",
+    "novelty": "first"
   },
   {
     "id": "dt-015",
@@ -142,7 +149,8 @@
     "time": "晚上，10分钟",
     "instructions": "关掉顶灯，只开台灯、小夜灯，或者拉开窗帘用窗外的光。在这个光线里待10分钟——读书、发呆、躺着都行。不用刻意做什么，就感受一下同一个房间在不同光线下的样子。",
     "scene_tags": ["home"],
-    "moments": ["evening", "late-night"]
+    "moments": ["evening", "late-night"],
+    "novelty": "variable"
   },
   {
     "id": "dt-019",
@@ -223,7 +231,8 @@
     "time": "在菜市场时",
     "instructions": "今天买菜的时候，在你通常不停的那些菜里挑一样，买最少的量——一两把、一根都行。不用想怎么做，买回去再说。就是探索一下。",
     "scene_tags": ["market"],
-    "gate0": "B"
+    "gate0": "B",
+    "novelty": "variable"
   },
   {
     "id": "dt-030",
@@ -241,7 +250,8 @@
     "time": "午餐或晚餐时",
     "instructions": "今天去食堂，不要直接排你最熟悉的那排，先走一圈把今天的菜都看一遍，再决定吃什么。不用非得点不熟悉的，就是先看。",
     "scene_tags": ["canteen"],
-    "gate0": "B"
+    "gate0": "B",
+    "novelty": "variable"
   },
   {
     "id": "dt-033",
@@ -250,7 +260,8 @@
     "time": "打饭时",
     "instructions": "今天打完饭，在走开之前对打饭或收餐具的师傅说一声「谢谢」。不用解释原因，也不用想太多，就是说。",
     "scene_tags": ["canteen"],
-    "gate0": "B"
+    "gate0": "B",
+    "novelty": "variable"
   },
   {
     "id": "dt-034",
@@ -259,7 +270,8 @@
     "time": "午餐或晚餐时",
     "instructions": "今天去食堂，找一道你从来没点过的菜，哪怕不确定好不好吃，点一份。不用全吃完，就是试一下。",
     "scene_tags": ["canteen"],
-    "gate0": "B"
+    "gate0": "B",
+    "novelty": "variable"
   },
   {
     "id": "dt-035",
@@ -273,7 +285,7 @@
   {
     "id": "dt-036",
     "title": "今天选一个动作做慢一半的速度",
-    "hook": "速度慢下来，你会感受到平时感受不到的",
+    "hook": "哪个动作做慢一半时，哪块肌肉的发力感最清楚？",
     "time": "健身途中",
     "instructions": "今天训练时，挑一个你熟悉的动作，把速度降到平时的一半，感受每一段动作里哪块肌肉在用力、在哪里发力。重量可以减轻一些，但速度一定要慢。",
     "scene_tags": ["gym"],
@@ -282,7 +294,7 @@
   {
     "id": "dt-037",
     "title": "热身时慢下来，感受每个动作",
-    "hook": "热身不只是走程序",
+    "hook": "热身时，身体哪里是紧的，哪里是松的？",
     "time": "热身时",
     "instructions": "今天热身的时候，不要急着进入正式训练，慢慢做每一个拉伸或热身动作，在动作里停一下，感受那个部位的感觉——紧绷、酸还是正常？就当在给今天的身体做一次检查。",
     "scene_tags": ["gym"],
@@ -295,7 +307,8 @@
     "time": "健身途中",
     "instructions": "今天在健身房，刻意走到一个你平时不去的区域，在那里站一会儿，看看这块地方有什么、有谁在用、跟你常待的地方有什么不一样的氛围。",
     "scene_tags": ["gym"],
-    "gate0": "B"
+    "gate0": "B",
+    "novelty": "variable"
   },
   {
     "id": "dt-039",
@@ -331,7 +344,8 @@
     "time": "驾车途中",
     "instructions": "今天开车去目的地，选一条你平时不走的路——可能多花几分钟，但会路过一些新的街道。不用记住什么，就是走一走那条路。",
     "scene_tags": ["driving"],
-    "gate0": "B"
+    "gate0": "B",
+    "novelty": "variable"
   },
   {
     "id": "dt-043",
@@ -340,7 +354,8 @@
     "time": "5-10分钟",
     "instructions": "今天进便利店，先直接走到最里面，从你平时最后才路过的那排开始逛。买不买都行，换个顺序把店走一遍。",
     "scene_tags": ["convenience-store"],
-    "gate0": "B"
+    "gate0": "B",
+    "novelty": "variable"
   },
   {
     "id": "dt-044",
@@ -349,7 +364,8 @@
     "time": "午餐或晚餐时",
     "instructions": "今天去食堂，走到人最少的那个窗口，看看它在卖什么。有点好奇就点一份试试；不点也行，至少你知道了。",
     "scene_tags": ["canteen"],
-    "gate0": "B"
+    "gate0": "B",
+    "novelty": "variable"
   },
   {
     "id": "dt-045",
@@ -377,7 +393,8 @@
     "time": "5分钟",
     "instructions": "今天有一趟上下楼，改走楼梯——不用多，一两层就行。看看这栋你天天待的楼，楼梯间是什么样子。",
     "scene_tags": ["workspace", "classroom", "home"],
-    "gate0": "B"
+    "gate0": "B",
+    "novelty": "variable"
   },
   {
     "id": "dt-048",
@@ -386,7 +403,8 @@
     "time": "2-3分钟",
     "instructions": "想一个你每天路过、但叫不上名字的东西——一棵树、一家店、一栋楼。今天路过时看清楚它，或者随手查一下它是什么。",
     "scene_tags": ["walking", "transit", "general"],
-    "gate0": "B"
+    "gate0": "B",
+    "novelty": "variable"
   },
   {
     "id": "dt-049",
@@ -403,7 +421,8 @@
     "time": "5分钟",
     "instructions": "把桌上的东西挪一挪——杯子换个位置，常用的东西换到另一边。用一天试试，不顺手再换回来。",
     "scene_tags": ["workspace", "home", "classroom"],
-    "gate0": "B"
+    "gate0": "B",
+    "novelty": "variable"
   },
   {
     "id": "push_003",

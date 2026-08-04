@@ -66,6 +66,20 @@ assertEqual(
 	"gate0 无标条目恰为不强判的 4 条（其余 65 条均已誊写）"
 );
 
+// novelty 新奇梯度标（2026-08-04 内容审计）：B 类细分为换变量级 / 首次级，供即时抽取结构软优先读取
+assertTrue(
+	dailyTasks.every((t) => t.novelty === undefined || t.novelty === "variable" || t.novelty === "first"),
+	"novelty 字段缺省或取值恰为 \"variable\"/\"first\""
+);
+assertEqual(
+	dailyTasks.filter((t) => t.novelty === "variable").length, 16,
+	"novelty=variable 恰为 16 条（换变量级）"
+);
+assertEqual(
+	dailyTasks.filter((t) => t.novelty === "first").length, 3,
+	"novelty=first 恰为 3 条（首次级）"
+);
+
 // 2. 图鉴：8个已建图鉴（2026-07-11同步：角落图鉴、物件图鉴已删除，时间实验图鉴并入城市探索图鉴，颜色图鉴+2条光影主题，自然接触图鉴+1条），条目数与已知齐全
 const collections = library.getAllCollections();
 assertEqual(collections.length, 8, "已建图鉴共8个");

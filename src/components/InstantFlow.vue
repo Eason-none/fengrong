@@ -106,7 +106,7 @@ import FirstTimeHint from '@/components/FirstTimeHint.vue'
 import { getUncompletedTasks, saveCompletedTask, getTodayCompleted } from '@/state/dailyTaskPool.js'
 import { getDailyTaskCandidates } from '@/content/library.js'
 import { getBasicInfo } from '@/state/basicInfo.js'
-import { inferMomentScenes, preferMomentCandidates, preferMoodCandidates } from '@/state/momentInference.js'
+import { inferMomentScenes, preferNoveltyCandidates, preferMomentCandidates, preferMoodCandidates } from '@/state/momentInference.js'
 import { createCompletionEvent, COMPLETION_INVITE_TEXT } from '@/state/completionEvent.js'
 import { createConversation, getConversationByCompletionEventId } from '@/state/conversation.js'
 import { maybeSilentTopup } from '@/utils/silentTopup.js'
@@ -172,7 +172,7 @@ export default {
         candidates = getDailyTaskCandidates(profileTags, excludeIds, 12)
       }
       if (!candidates.length) return null
-      const picked = preferMoodCandidates(preferMomentCandidates(candidates, now, this.weatherText), this.mood)[0]
+      const picked = preferMoodCandidates(preferNoveltyCandidates(preferMomentCandidates(candidates, now, this.weatherText)), this.mood)[0]
       this.shownIds.push(picked.id)
       return picked
     },
