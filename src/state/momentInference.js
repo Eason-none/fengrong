@@ -1,7 +1,8 @@
 // 即时任务"此刻感"时刻推断（openspec: add-instant-moment-fit）
+// + 心情软优先（openspec: add-instant-mood-fit）——心情是"内部时刻"，与时段/天气同属即时抽取软优先域。
 // 纯函数无副作用：时段桶 + 「桶 × 工作日/周末 → 合理场景」规则表，与档案 scene_tags 求交。
 // general 不进表——由 getDailyTaskCandidates 的补足机制天然兜底。
-// 桶名与亲和标签不进 UI、不进 analytics（机制对用户不可见）。
+// 桶名、亲和标签与心情均不进 UI 机制文案、不进 analytics、不落 storage（机制对用户不可见）。
 
 // 四档时段桶：morning 06-09 / daytime 09-18 / evening 18-22 / late-night 22-06（本地时间）
 export function getMomentBucket(date) {
@@ -59,6 +60,46 @@ export function preferMomentCandidates(candidates, date, weatherText) {
 		if (hasWeather && (!weather || !t.weather_affinity.includes(weather))) return false;
 		return true;
 	};
+	const prefer = candidates.filter(compatible);
+	if (!prefer.length) return candidates;
+	return [...prefer, ...candidates.filter((t) => !compatible(t))];
+}
+
+// 启动成本派生表（add-instant-mood-fit）：不给内容加字段，由 scene_tags 客观派生。
+// 就地 = 人已身处其中即可做；出门 = 需要移动到位。两表并集须覆盖全部非 general 场景枚举
+// （verify-momentInference.mjs 有断言防新增场景漏归类）。
+export const IN_PLACE_SCENES = ["home", "workspace", "classroom", "transit", "driving"];
+export const OUT_SCENES = ["walking", "market", "convenience-store", "gym", "canteen"];
+
+// 活力的"出门"必须是真出门：含出门场景**且不含任何就地场景锚点**——就地锚点在场
+// 意味着人不用挪地方也能做（如 [walking,home] 的看天空），沾个 walking 标不算出门。
+// general 不算就地锚点（[convenience-store,general] 的内容仍要求到店）。
+// （2026-07-17 真机验收修订：原"沾一个出门场景即相容"让就地感知条目占满活力层。）
+const isOutTask = (t) =>
+	Array.isArray(t.scene_tags) &&
+	t.scene_tags.some((s) => OUT_SCENES.includes(s)) &&
+	!t.scene_tags.some((s) => IN_PLACE_SCENES.includes(s));
+const isInPlaceTask = (t) =>
+	Array.isArray(t.scene_tags) &&
+	t.scene_tags.length > 0 &&
+	t.scene_tags.every((s) => !OUT_SCENES.includes(s)); // general 视为就地可做
+
+// 心情 → 客观属性映射（design D4）。心情是主观的，内容只有客观属性，映射只存在于这里。
+// 沮丧/烦躁路由一致（chip 分开只为让用户被准确叫出名字）：A 类感知重定向 + 就地低启动。
+// 无聊：B 类新鲜尝试（缺的是刺激）。活力：真出门/移动类（趁能量在，gate0 不限）。
+const MOOD_COMPATIBLE = {
+	down: (t) => t.gate0 === "A" && isInPlaceTask(t),
+	restless: (t) => t.gate0 === "A" && isInPlaceTask(t),
+	bored: (t) => t.gate0 === "B",
+	energetic: isOutTask,
+};
+
+// 心情软优先（add-instant-mood-fit）：稳定分层，叠加在 preferMomentCandidates 结果之外层
+// （心情是用户显式说出的信号，权重高于系统推断的时刻信号；层内保持时刻优先序）。
+// 无 mood / 未知 mood / 无相容条目时原样返回——心情层永不过滤候选、永不引入新空态。
+export function preferMoodCandidates(candidates, mood) {
+	const compatible = MOOD_COMPATIBLE[mood];
+	if (!compatible) return candidates;
 	const prefer = candidates.filter(compatible);
 	if (!prefer.length) return candidates;
 	return [...prefer, ...candidates.filter((t) => !compatible(t))];

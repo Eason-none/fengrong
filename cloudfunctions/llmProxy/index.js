@@ -9,8 +9,11 @@
 //   QWEN_BASE_URL / QWEN_API_KEY
 //   DEEPSEEK_BASE_URL / DEEPSEEK_API_KEY
 //
-// 入参 event：{ target: 'qwen' | 'deepseek', model, messages }
+// 入参 event：{ target: 'qwen' | 'deepseek' | 'breathing-audio', model?, messages?, enable_thinking? }
+//   target='breathing-audio' 时不走 LLM 路由：以管理端权限签发呼吸环境音的云存储临时 URL（见下方常量注释）。
 //   model 由小程序端从 VITE_QWEN_MODEL / VITE_DEEPSEEK_MODEL 带上来，云函数只转发不关心具体值。
+//   enable_thinking 是白名单透传的可选上游参数（qwen 思考型模型关思考直答，见 qwen.js）；
+//   刻意不整包透传 event——客户端可构造任意入参，白名单挡住向上游注入未知参数的口子。
 // 返回：{ statusCode, data }
 //   data 是上游 OpenAI 兼容响应的原始 JSON，客户端按 data.choices[0].message.content 读取，
 //   与原 uni.request 的 { res.statusCode, res.data } 同形——客户端解析逻辑几乎不用改。
@@ -19,6 +22,31 @@
 
 const https = require('https')
 const { URL } = require('url')
+const cloud = require('wx-server-sdk')
+
+cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
+
+// 呼吸环境音（breathing-entry）：云存储权限是默认的"仅创建者可读写"（免费套餐不可改 ACL），
+// 客户端直连 getTempFileURL 被拒——改由本函数以管理端权限签发临时 URL（不受存储 ACL 限制）。
+// fileID 收在服务端：客户端不传任何文件参数，杜绝借管理端权限读任意存储文件的口子。
+const BREATHING_AUDIO_FILE_ID =
+	'cloud://cloud1-d5g1184gm42fa15f4.636c-cloud1-d5g1184gm42fa15f4-1453722699/audio/01轻微清晰明亮远处翻涌_连续铺底冲击突出_海浪拍岸_助眠冥_爱给网_aigei_com.mp3'
+const BREATHING_AUDIO_URL_MAX_AGE_S = 3 * 24 * 3600
+
+async function breathingAudioUrl() {
+	try {
+		const res = await cloud.getTempFileURL({
+			fileList: [{ fileID: BREATHING_AUDIO_FILE_ID, maxAge: BREATHING_AUDIO_URL_MAX_AGE_S }],
+		})
+		const f = res.fileList && res.fileList[0]
+		if (f && f.tempFileURL) {
+			return { statusCode: 200, data: { url: f.tempFileURL, maxAgeS: BREATHING_AUDIO_URL_MAX_AGE_S } }
+		}
+		return { statusCode: 500, data: { error: `getTempFileURL 未返回 URL：${f ? f.status + ' ' + (f.errMsg || '') : '空结果'}` } }
+	} catch (err) {
+		return { statusCode: 502, data: { error: `getTempFileURL 失败：${err.message}` } }
+	}
+}
 
 const ROUTES = {
 	qwen: { base: process.env.QWEN_BASE_URL, key: process.env.QWEN_API_KEY },
@@ -64,7 +92,8 @@ function postJson(urlStr, key, bodyObj) {
 }
 
 exports.main = async (event) => {
-	const { target, model, messages } = event || {}
+	const { target, model, messages, enable_thinking } = event || {}
+	if (target === 'breathing-audio') return breathingAudioUrl()
 	const route = ROUTES[target]
 	if (!route) {
 		return { statusCode: 400, data: { error: `未知 target：${target}，期望 'qwen' 或 'deepseek'` } }
@@ -76,7 +105,12 @@ exports.main = async (event) => {
 	// 小程序端不做流式，stream 恒为 false。
 	const upstream = route.base.replace(/\/+$/, '') + '/chat/completions'
 	try {
-		return await postJson(upstream, route.key, { model, messages, stream: false })
+		return await postJson(upstream, route.key, {
+			model,
+			messages,
+			stream: false,
+			...(enable_thinking !== undefined ? { enable_thinking } : {}),
+		})
 	} catch (err) {
 		return { statusCode: 502, data: { error: `上游请求失败：${err.message}` } }
 	}

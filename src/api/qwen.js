@@ -143,10 +143,14 @@ async function streamMainChatH5(systemPrompt, history, onDelta) {
 // 完整回答后一次性回调onDelta，调用方拿到的仍是同一套"增量回调"接口，不需要关心两端实现差异。
 // 流式动效在mp-weixin端的体验落差记录为已知风险，留待后续升级。
 async function streamMainChatWeixin(systemPrompt, history, onDelta) {
+	// enable_thinking:false（polish-beta-feedback-2 D7）：qwen3.7-plus 默认带思考过程，非流式下
+	// 思考 token 全程干等（内测：首响 10~15s）。本场景是 ≤3 句的见证式回应，质量由 system prompt
+	// 主导，关思考=同模型直答，预期首响降到 3~5s。若真机对比回复质感下降，回滚=删这一个参数。
 	const { statusCode, data } = await callLlmCloud({
 		target: "qwen",
 		model: MODEL,
 		messages: [{ role: "system", content: systemPrompt }, ...history],
+		enable_thinking: false,
 	})
 	if (statusCode !== 200) {
 		throw new Error(`Qwen API请求失败：${statusCode} ${JSON.stringify(data)}`)

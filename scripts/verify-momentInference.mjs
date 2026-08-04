@@ -1,7 +1,14 @@
 // 断言脚本：时刻推断纯函数（openspec: add-instant-moment-fit tasks 1.2）
 // 运行：node scripts/verify-momentInference.mjs
 import assert from "node:assert/strict";
-import { getMomentBucket, inferMomentScenes, preferMomentCandidates } from "../src/state/momentInference.js";
+import {
+	getMomentBucket,
+	inferMomentScenes,
+	preferMomentCandidates,
+	preferMoodCandidates,
+	IN_PLACE_SCENES,
+	OUT_SCENES,
+} from "../src/state/momentInference.js";
 
 // 2026-07-08 是周三（工作日），2026-07-11 是周六（周末）
 const weekday = (h, m = 0) => new Date(2026, 6, 8, h, m);
@@ -68,5 +75,65 @@ assert.deepEqual(preferMomentCandidates(neutral, weekday(14), null).map((t) => t
 assert.equal(ordered.length, cands.length);
 assert.deepEqual([...ordered].map((t) => t.id).sort(), cands.map((t) => t.id).sort());
 console.log("PASS 软优先排序");
+
+// ---- 6. 心情软优先（add-instant-mood-fit） ----
+// 派生表覆盖全场景枚举：就地∪出门 = 全部非 general 场景，且两表不相交（防新增场景漏归类）
+const ALL_SCENES = [
+	"workspace", "classroom", "home", "transit", "walking",
+	"driving", "convenience-store", "canteen", "gym", "market",
+];
+assert.deepEqual(
+	[...IN_PLACE_SCENES, ...OUT_SCENES].sort(),
+	[...ALL_SCENES].sort(),
+	"就地/出门派生表必须恰好覆盖全部非 general 场景",
+);
+assert.equal(IN_PLACE_SCENES.filter((s) => OUT_SCENES.includes(s)).length, 0);
+console.log("PASS 派生表覆盖全场景");
+
+const moodCands = [
+	{ id: "m1", gate0: "A", scene_tags: ["home"] }, // A+就地：沮丧/烦躁相容
+	{ id: "m2", gate0: "A", scene_tags: ["walking", "home"] }, // A+混合打标：有就地锚点，活力不相容（2026-07-17 修订）
+	{ id: "m3", gate0: "B", scene_tags: ["home"] }, // B：无聊相容
+	{ id: "m4", gate0: "B", scene_tags: ["market"] }, // B+纯出门：无聊、活力都相容
+	{ id: "m5", scene_tags: ["gym"] }, // 无 gate0：纯出门 → 仅活力相容
+	{ id: "m6", scene_tags: ["workspace"] }, // 无 gate0 全就地：全心情中性
+	{ id: "m7", gate0: "A", scene_tags: ["general"] }, // A+general（general 视为就地）
+	{ id: "m8", scene_tags: ["convenience-store", "general"] }, // 出门+general：general 不算就地锚点 → 活力相容
+];
+// 沮丧/烦躁：A 且全就地（m1、m7）置前，层内相对顺序不变
+assert.deepEqual(preferMoodCandidates(moodCands, "down").map((t) => t.id), ["m1", "m7", "m2", "m3", "m4", "m5", "m6", "m8"]);
+assert.deepEqual(preferMoodCandidates(moodCands, "restless").map((t) => t.id), ["m1", "m7", "m2", "m3", "m4", "m5", "m6", "m8"]);
+// 无聊：gate0===B（m3、m4）置前
+assert.deepEqual(preferMoodCandidates(moodCands, "bored").map((t) => t.id), ["m3", "m4", "m1", "m2", "m5", "m6", "m7", "m8"]);
+// 活力：真出门（含出门场景且无就地锚点：m4、m5、m8）置前，不看 gate0；混合打标 m2 不再相容
+assert.deepEqual(preferMoodCandidates(moodCands, "energetic").map((t) => t.id), ["m4", "m5", "m8", "m1", "m2", "m3", "m6", "m7"]);
+// 无 mood / 未知 mood → 原样返回
+assert.deepEqual(preferMoodCandidates(moodCands, null).map((t) => t.id), moodCands.map((t) => t.id));
+assert.deepEqual(preferMoodCandidates(moodCands, "开心").map((t) => t.id), moodCands.map((t) => t.id));
+// 无相容条目 → 原样返回（gate0 缺省中性不被抬前）
+const noFit = [{ id: "n1", scene_tags: ["home"] }, { id: "n2", gate0: "A", scene_tags: ["market"] }];
+assert.deepEqual(preferMoodCandidates(noFit, "bored").map((t) => t.id), ["n1", "n2"]);
+// 永不丢候选
+for (const mood of ["down", "restless", "bored", "energetic"]) {
+	const out = preferMoodCandidates(moodCands, mood);
+	assert.equal(out.length, moodCands.length);
+	assert.deepEqual(out.map((t) => t.id).sort(), moodCands.map((t) => t.id).sort());
+}
+// 与时刻软优先叠加：mood 分层在外、层内保持传入序
+const layered = preferMoodCandidates(
+	preferMomentCandidates(
+		[
+			{ id: "L1", gate0: "B", scene_tags: ["home"] },
+			{ id: "L2", gate0: "B", scene_tags: ["home"], moments: ["daytime"] }, // 时刻相容
+			{ id: "L3", scene_tags: ["home"] },
+		],
+		weekday(14),
+		null,
+	),
+	"bored",
+);
+// 时刻优先后 L2 在 L1 前；无聊层再把 B 类整体置前 → L2、L1、L3
+assert.deepEqual(layered.map((t) => t.id), ["L2", "L1", "L3"]);
+console.log("PASS 心情软优先");
 
 console.log("verify-momentInference: 全部通过");

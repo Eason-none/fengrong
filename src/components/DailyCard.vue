@@ -58,12 +58,24 @@
           </view>
         </view>
 
-        <!-- 换一批 -->
-        <view v-if="refreshCount < 3" class="daily-card__refresh" hover-class="u-press" @tap="doRefresh">
-          换一批
+        <!-- 换一批三态：见底 > 疲惫 > 按钮。见底是硬事实（可能由领完全部条目的人触发），
+             压过"你可能累了"的推断，文案不得用"没找到想做的"语气 -->
+        <view v-if="poolExhausted" class="daily-card__refresh-exhausted">
+          今天能给你的都在这儿啦，改天再来看看新的。
         </view>
-        <view v-else class="daily-card__refresh-exhausted">
-          换了好几批了，没找到今天想做的也没关系，关掉就好，下次再看。
+        <template v-else-if="refreshCount >= 3">
+          <view class="daily-card__refresh-exhausted">
+            换了好几批了，今天没遇到想做的也没关系，不一定非得做点什么。
+          </view>
+          <view class="daily-card__soft-exit" hover-class="u-press" @tap="$emit('go-explore')">
+            去丰容探索随便逛逛
+          </view>
+          <view class="daily-card__soft-exit" hover-class="u-press" @tap="$emit('open-three-good-things')">
+            说说今天的幸福小事
+          </view>
+        </template>
+        <view v-else class="daily-card__refresh" hover-class="u-press" @tap="doRefresh">
+          换一批
         </view>
 
         <!-- BasicInfo 不完整时的引导 -->
@@ -101,7 +113,7 @@ function getTodayStr() {
 
 export default {
   name: 'DailyCard',
-  emits: ['claim', 'close', 'go-basic-info', 'clear-completed', 'chat-completed'],
+  emits: ['claim', 'close', 'go-basic-info', 'clear-completed', 'chat-completed', 'go-explore', 'open-three-good-things'],
   props: {
     playerInfo: { type: Object, default: () => ({}) },
     city: { type: String, default: null },
@@ -118,7 +130,8 @@ export default {
       claimedIds: pool.map((t) => t.id),
       todayStr: getTodayStr(),
       localCandidates: [...(this.candidates || [])],
-      refreshCount: 0,
+      refreshCount: 0, // 连续空手换批次数：领取归零，只捕捉"换了又不领"的疲惫信号
+      poolExhausted: false, // 池子见底（抽不出新批）；单向，本次卡片会话内不回退
     }
   },
   computed: {
@@ -153,17 +166,25 @@ export default {
       maybeSilentTopup() // 静默攒提醒额度（有守卫，绝不弹窗；见 utils/silentTopup.js）
       claimTask(task)
       this.claimedIds.push(task.id)
+      // 领了就不是"换了又不领"——归零，让每批都领的用户能一直换到池子见底。
+      // 已进疲惫态则不解锁：当次会话内保持停用（推送而非选择），重开卡片自然归零。
+      if (this.refreshCount < 3) this.refreshCount = 0
       this.$emit('claim', task)
     },
     doRefresh() {
-      if (this.refreshCount >= 3) return
+      if (this.refreshCount >= 3 || this.poolExhausted) return
       const sceneTags = this.playerInfo?.scene_tags || []
       // 排除当前正在展示的候选：保证"换一批"换出来的都是刚才没见过的条目
       // （小场景匹配池下不排除很容易抽回同一条——真机验收反馈）。
-      // 新批不足3条就少展示几条；一条新的都抽不出时保留当前批（池子见底，换无可换）。
+      // 新批不足3条就少展示几条。
       const excludeIds = [...this.claimedIds, ...this.localCandidates.map((t) => t.id)]
       const next = getDailyTaskCandidates(sceneTags, excludeIds)
-      if (next.length > 0) this.localCandidates = next
+      if (next.length === 0) {
+        // 池子见底：保留当前批、不扣计数，明示到底而不是让按钮静默失效
+        this.poolExhausted = true
+        return
+      }
+      this.localCandidates = next
       this.refreshCount++
     },
   },
@@ -362,6 +383,17 @@ export default {
   line-height: 1.7;
   text-align: center;
   padding: 0 8rpx;
+}
+
+.daily-card__soft-exit {
+  margin-top: 24rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: var(--c-primary);
+  padding: 20rpx 0;
+  border: 1rpx solid var(--c-border-s);
+  border-radius: 999rpx;
+  transition: transform 0.12s ease, opacity 0.12s ease;
 }
 
 .daily-card__guide {

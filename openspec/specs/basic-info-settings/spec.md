@@ -32,7 +32,7 @@ TBD - created by archiving change daily-task-system. Update Purpose after archiv
 - **维度二·通勤方式**：地铁/公交 / 步行/骑行 / 私家车（多选）
 - **维度三·经常去的地方**：便利店 / 食堂 / 健身房 / 菜市场（多选）
 
-用户 SHALL 能勾选任意数量选项，三个维度均为可选。
+用户 SHALL 能勾选任意数量选项，三个维度均为可选。三组维度前 SHALL 有一句轻量目的说明（定稿文案：「小事会照着这些地方来找你——按真实生活勾就好。不选也能用，但是可能会对"来件小事"有点小影响~」），先说用途、再以轻巧口吻提及不勾选的小影响；SHALL NOT 用施压/警示语气，SHALL NOT 出现"推荐/匹配/算法"等机制词。
 
 #### Scenario: 用户勾选场景偏好
 - **WHEN** 用户勾选若干选项并保存
@@ -48,4 +48,15 @@ TBD - created by archiving change daily-task-system. Update Purpose after archiv
 #### Scenario: 修改后立即生效
 - **WHEN** 用户修改基本信息并保存
 - **THEN** 存储中的 BasicInfo 更新，不需要重启或特殊操作
+
+### Requirement: 出生日期可清除
+已选择的出生日期 SHALL 可以在基本信息编辑页清除、回到未填状态（字段行内提供清除入口，无确认弹窗）。清除并保存后 `birth_date` SHALL 存为空值，日推卡片按未填降级展示（存活天数行不显示）。
+
+#### Scenario: 清除已选日期
+- **WHEN** 用户对已选择的出生日期点击清除并保存
+- **THEN** `birth_date` 置空，再次进入编辑页时日期选择器显示未填占位
+
+#### Scenario: 清除后卡片降级
+- **WHEN** 出生日期被清除后日推卡片展示
+- **THEN** 累计生存天数行不显示，其余内容照常
 

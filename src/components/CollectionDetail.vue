@@ -70,6 +70,7 @@
       :conversation-id="conversationId"
       :content-title="selectedItem.title"
       :instructions="selectedItem.instructions"
+      :content-hook="selectedItem.hook"
       :previous-summary="previousSummary"
       @close="onChatClose"
     />

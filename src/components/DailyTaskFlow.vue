@@ -42,6 +42,7 @@
     :conversation-id="conversationId"
     :content-title="task.title"
     :instructions="task.instructions"
+    :content-hook="task.hook"
     :previous-summary="null"
     @close="close"
   />

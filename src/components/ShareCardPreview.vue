@@ -88,11 +88,6 @@
 // 发不发给别人是相册里的下一步（感知先于展示）。
 import { buildDiaryCardModel, buildReviewCardModel } from '@/utils/shareCard.js'
 
-// 小程序码来源单一常量（design.md D3）：MVP 用小程序后台预生成的静态码图（放 src/static/ 后
-// 把路径填到这里）；带 scene 参数的动态码留生产阶段随代理做，替换只动这一行。
-// 为空时绘制占位环（内测期可接受，不发任何网络请求）。
-const SUNCODE_IMAGE = ''
-
 // 画布设计尺寸（逻辑 px），导出时 2 倍采样；全文信纸卡超高时回退节选（spec：画布上限兜底）
 const CARD_W = 340
 const MAX_H = 1400
@@ -182,9 +177,8 @@ function roundRectPath(ctx, x, y, w, h, r) {
   ctx.closePath()
 }
 
-// 纸样（add-share-card-styles，用户定稿 2026-07-15）：无纯白选项，默认宣纸米
+// 纸样（add-share-card-styles 定稿 2026-07-15；2026-07-19 删宣纸米）：无纯白选项，默认水彩晕
 const PAPERS = [
-  { id: 'rice', label: '宣纸米', base: '#f8f4ea' },
   { id: 'wash', label: '水彩晕', base: '#fbfcf8' },
   { id: 'ruled', label: '信笺线', base: '#f6f9f3' },
   { id: 'leaf', label: '叶影', base: '#f5f8f2' },
@@ -194,7 +188,7 @@ const RULED_LINE = 'rgba(18, 71, 3, 0.16)' // 信笺横线：随正文逐行绘�
 
 // 压花叶程序绘制：与 CompletionBeat/聊天收尾印章同一片叶（40×100 坐标系：
 // 对称轮廓 + 贯穿顶尖到叶柄的中轴 + 左右各两条镜像错落侧脉）。scale/angle 复用于
-// 摘句版式的金叶印与叶影纸样的倾斜散布。线宽随 scale 缩放，与 SVG 表现一致。
+// 句读版式的金叶印、叶影纸样的倾斜散布与页脚叶枝。线宽随 scale 缩放，与 SVG 表现一致。
 function drawLeaf(ctx, { x, y, scale, angle, stroke }) {
   ctx.save()
   ctx.translate(x, y)
@@ -230,6 +224,29 @@ function drawLeaf(ctx, { x, y, scale, angle, stroke }) {
   ctx.restore()
 }
 
+// 页脚叶枝（2026-07-19 替换太阳码）：一根微弯短枝，左右各一片新发的叶——
+// 叶片与叶影/完成一拍同一片压花叶（drawLeaf），左叶略高右叶略低，取欣欣向荣的错落感
+function drawSprig(ctx, { x, y, stroke }) {
+  ctx.save()
+  ctx.setStrokeStyle(stroke)
+  try { ctx.setLineCap('round') } catch (e) { /* 平头也可 */ }
+  ctx.setLineWidth(1.4)
+  ctx.beginPath()
+  ctx.moveTo(x, y + 14)
+  ctx.bezierCurveTo(x + 2, y + 6, x - 2, y - 4, x, y - 13)
+  ctx.stroke()
+  ctx.restore()
+  const s = 0.22
+  // [张开角, 挂点]：把叶柄末端（drawLeaf 局部坐标 20,85）精确对到枝上挂点——
+  // drawLeaf 绕自身平移原点旋转，这里按旋转矩阵反推该原点应放的位置
+  for (const [angle, px, py] of [[-35, x - 1, y - 2], [35, x + 1, y + 3]]) {
+    const rad = (angle * Math.PI) / 180
+    const ox = 20 * s * Math.cos(rad) - 85 * s * Math.sin(rad)
+    const oy = 20 * s * Math.sin(rad) + 85 * s * Math.cos(rad)
+    drawLeaf(ctx, { x: px - ox, y: py - oy, scale: s, angle, stroke })
+  }
+}
+
 export default {
   name: 'ShareCardPreview',
   props: {
@@ -246,7 +263,7 @@ export default {
       useFullText: false,
       // 版式/纸样（add-share-card-styles）：组件态，不落库不上报不进 card model
       layoutStyle: 'specimen',
-      paper: 'rice',
+      paper: 'wash',
       drawing: false,
       saving: false,
       saved: false, // 存过一次后：按钮变"存好了"，再点即"回去"（emit close）
@@ -261,7 +278,21 @@ export default {
     // （报 "Cannot read property 'width' of undefined"）。模板也不引用它们。
     this.photoInfos = [] // [{ path, width, height, img? }] 预解析的照片（img 仅同层 2d canvas 用）
     this.canvasNode = null // mp-weixin 同层 2d canvas 节点（导出时要传 node 而不是 canvasId）
-    this.suncodeImg = null // 太阳码在 2d canvas 里的预载 Image
+    // 照片临时文件名的会话戳：微信按"路径"缓存已解码位图，固定文件名会让这次分享
+    // 拿到上一次分享缓存的旧照片（2026-07-16 真机反馈：新页文字配了几天前的照片；
+    // 开发者工具缓存策略不同，仅真机暴露）。每次打开预览用新戳=新路径，缓存必失效。
+    this.tmpStamp = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+    // #ifdef MP-WEIXIN
+    // 顺手清扫历史残留（含旧版固定名 sharecard_photo_*）：临时文件只服务当次绘制
+    try {
+      const fs = wx.getFileSystemManager()
+      for (const f of fs.readdirSync(wx.env.USER_DATA_PATH)) {
+        if (f.startsWith('sharecard_')) fs.unlinkSync(`${wx.env.USER_DATA_PATH}/${f}`)
+      }
+    } catch (e) {
+      // 清扫失败不影响功能：新戳路径已保证不撞缓存
+    }
+    // #endif
     // 视口可用高度：留 ~310px 给"‹回去"/节选切换/版式行/纸样行/"存进相册"及内边距+安全区，
     // 其余给卡片显示区。scroll-view 拿到确定像素高度才会真正滚动（见 .share-preview__stage 注释）。
     const win = uni.getWindowInfo ? uni.getWindowInfo() : uni.getSystemInfoSync()
@@ -284,8 +315,8 @@ export default {
     layoutOptions() {
       if (this.review) return []
       const opts = [
-        { id: 'specimen', label: '标本页' },
-        { id: 'quote', label: '摘句' },
+        { id: 'specimen', label: '手帐' },
+        { id: 'quote', label: '句读' },
       ]
       if (this.model.kind === 'photo') opts.push({ id: 'photo', label: '照片开窗' })
       return opts
@@ -351,8 +382,9 @@ export default {
       if (src.startsWith('data:image')) {
         try {
           const fs = wx.getFileSystemManager()
-          // 文件名带序号：一张卡最多 3 张照片，同名会互相覆盖
-          path = `${wx.env.USER_DATA_PATH}/sharecard_photo_${index}.png`
+          // 文件名 = 会话戳 + 序号：戳保证跨次分享路径唯一（防路径级位图缓存回放旧图，
+          // 见 created 注释），序号防同卡三张互相覆盖。同次预览内重绘复用同路径无害（同内容）。
+          path = `${wx.env.USER_DATA_PATH}/sharecard_${this.tmpStamp}_${index}.png`
           fs.writeFileSync(path, src.slice(src.indexOf(',') + 1), 'base64')
         } catch (e) {
           console.error('[share-card] photo temp write failed:', e)
@@ -451,9 +483,6 @@ export default {
       this.canvasNode = node
       const raw = node.getContext('2d')
       const ctx = legacyCtxAdapter(raw)
-      if (SUNCODE_IMAGE && !this.suncodeImg) {
-        this.suncodeImg = await loadNodeImage(node, SUNCODE_IMAGE)
-      }
       this.photoInfos = await this.resolvePhotos(node)
       this.cssH = this.computeHeight(ctx)
       await this.$nextTick()
@@ -549,29 +578,23 @@ export default {
           y += 6 // 段间距
         }
       } else if (this.layoutStyle === 'quote') {
-        // 摘句版式（add-share-card-styles）：文字即主角——日期居中、金叶印（与完成一拍
-        // 同一片压花叶）、正文放大居中、落款——「标题」。照片刻意不上卡。
+        // 句读版式（原摘句，2026-07-19 弃居中改左对齐排印）：文字即主角——日期左起、
+        // 金叶印靠右如钤印（与完成一拍同一片压花叶）、正文放大左对齐、落款靠右。照片刻意不上卡。
         y += 4
         push((yy) => {
           this.setFont(ctx, 10)
           ctx.setFillStyle(C.muted)
-          ctx.setTextAlign('center')
-          ctx.fillText(m.date, CARD_W / 2, yy + 10)
-          ctx.setTextAlign('left')
-        }, 24)
-        push((yy) => {
-          drawLeaf(ctx, { x: CARD_W / 2 - 7, y: yy, scale: 0.34, angle: 0, stroke: C.gold })
-        }, 40)
+          ctx.fillText(m.date, innerX, yy + 10)
+          drawLeaf(ctx, { x: innerX + innerW - 18, y: yy - 4, scale: 0.34, angle: 14, stroke: C.gold })
+        }, 38)
         for (const rawLine of m.lines) {
-          const lines = this.wrapText(ctx, rawLine, 15, innerW - 8)
+          const lines = this.wrapText(ctx, rawLine, 15, innerW)
           for (const line of lines) {
             push((yy) => {
               ruleAt(yy + 20)
               this.setFont(ctx, 15, { kai: true })
               ctx.setFillStyle(C.body)
-              ctx.setTextAlign('center')
-              ctx.fillText(line, CARD_W / 2, yy + 15)
-              ctx.setTextAlign('left')
+              ctx.fillText(line, innerX, yy + 15)
             }, 15 * 2.1)
           }
           y += 3
@@ -582,15 +605,15 @@ export default {
           push((yy) => {
             this.setFont(ctx, 11, { kai: true })
             ctx.setFillStyle(C.muted)
-            ctx.setTextAlign('center')
-            ctx.fillText(line, CARD_W / 2, yy + 11)
+            ctx.setTextAlign('right')
+            ctx.fillText(line, innerX + innerW, yy + 11)
             ctx.setTextAlign('left')
           }, 11 * 1.8)
         }
       } else {
         // 照片开窗版式（add-share-card-styles）：首图 cover 裁切满幅贴卡顶——开窗即取景框，
-        // 标本页拼贴的"只缩不裁"不适用于此版式（用户看样机定稿的语义）。照片解析失败时
-        // photoInfos 为空，photoWindow 自动为 false，回落到标本页流程。
+        // 手帐拼贴的"只缩不裁"不适用于此版式（用户看样机定稿的语义）。照片解析失败时
+        // photoInfos 为空，photoWindow 自动为 false，回落到手帐流程。
         const photoWindow = this.layoutStyle === 'photo' && this.photoInfos.length > 0
         if (photoWindow) {
           const info = this.photoInfos[0]
@@ -607,28 +630,46 @@ export default {
             ctx.restore()
           }, winH + 14)
         }
-        // 照片区：纵向简单拼贴（2026-07-13 用户定版，宫格 cover 裁切废弃——形变/裁切都不可接受）。
-        // 每张按原比例缩放到内容宽；过高的竖图整张缩小居中（PHOTO_MAX_H 上限），只缩不裁。
-        const PHOTO_MAX_H = 300
+        // 照片区：散置拼贴（2026-07-19 定版，替代纵向罗列的拥挤感）——每张裹白边相纸、
+        // 轻微倾斜左右错落、相邻轻叠一角、相纸顶沿压小段胶带。仍守 2026-07-13 约束：
+        // 只缩不裁、不形变（宫格 cover 裁切彼时已废弃）。
+        const PHOTO_MAX_H = 260
+        const FRAME = 7 // 相纸白边
         if (!photoWindow) {
-          for (const info of this.photoInfos) {
-            let dw = innerW
-            let dh = Math.round((innerW * info.height) / info.width) || PHOTO_MAX_H
+          const n = this.photoInfos.length
+          this.photoInfos.forEach((info, i) => {
+            let dw = n === 1 ? innerW - 20 : Math.round(innerW * 0.74)
+            let dh = Math.round((dw * info.height) / info.width) || PHOTO_MAX_H
             if (dh > PHOTO_MAX_H) {
               dh = PHOTO_MAX_H
               dw = Math.round((PHOTO_MAX_H * info.width) / info.height)
             }
-            const dx = innerX + (innerW - dw) / 2
-            const blockH = dh
+            const frameW = dw + FRAME * 2
+            const frameH = dh + FRAME * 2
+            const angle = [-2.5, 3, -1.5][i % 3]
+            // 单张或超宽相纸居中，其余左右交替贴边
+            const cx = n === 1 || frameW >= innerW - 12
+              ? innerX + innerW / 2
+              : i % 2 === 0 ? innerX + frameW / 2 : innerX + innerW - frameW / 2
+            // 倾斜后的外接高度余量（正弦近似）；量高与落笔同源，两遍布局一致
+            const slack = Math.ceil(Math.abs(Math.sin((angle * Math.PI) / 180)) * frameW)
+            const blockH = frameH + slack + 8 // 顶部留胶带探头空间
             push((yy) => {
+              const cyy = yy + 8 + (frameH + slack) / 2
               ctx.save()
-              roundRectPath(ctx, dx, yy, dw, dh, 3)
-              ctx.clip()
-              ctx.drawImage(info.img || info.path, dx, yy, dw, dh)
+              ctx.translate(cx, cyy)
+              ctx.rotate((angle * Math.PI) / 180)
+              try { ctx.setShadow(0, 2, 6, 'rgba(8, 16, 6, 0.14)') } catch (e) { /* 无阴影就平铺 */ }
+              ctx.setFillStyle('#fffefb')
+              ctx.fillRect(-frameW / 2, -frameH / 2, frameW, frameH)
+              try { ctx.setShadow(0, 0, 0, 'rgba(0,0,0,0)') } catch (e) { /* 同上 */ }
+              ctx.drawImage(info.img || info.path, -dw / 2, -dh / 2, dw, dh)
+              // 相纸顶沿一小段胶带（与卡顶胶带同色）
+              ctx.setFillStyle('rgba(214, 196, 150, 0.62)')
+              ctx.fillRect(-15, -frameH / 2 - 6, 30, 13)
               ctx.restore()
-            }, blockH + 10)
-          }
-          if (this.photoInfos.length) y += 2 // 照片区与日期行的呼吸空隙（每张已带 10 间距）
+            }, i === n - 1 ? blockH + 8 : blockH - 10) // 相邻相纸轻叠一角，末张留呼吸空隙
+          })
         }
         push((yy) => {
           this.setFont(ctx, 10)
@@ -689,7 +730,7 @@ export default {
         }
       }
 
-      // -- 页脚：分隔线 + slogan + 太阳码 --
+      // -- 页脚：分隔线 + slogan + 叶枝 --
       y += 10
       const footTop = y
       const footH = 44
@@ -731,27 +772,8 @@ export default {
         this.setFont(ctx, 10)
         ctx.setFillStyle(C.gold)
         ctx.fillText(m.slogan.split('').join(' '), innerX, footTop + 26)
-        const codeCx = innerX + innerW - 17
-        const codeCy = footTop + 24
-        if (SUNCODE_IMAGE) {
-          ctx.drawImage(this.suncodeImg || SUNCODE_IMAGE, codeCx - 15, codeCy - 15, 30, 30)
-        } else {
-          // 占位环：真码 PNG 落库前的降级（不发请求）
-          ctx.setStrokeStyle(C.muted)
-          ctx.setLineWidth(2)
-          try {
-            ctx.setLineDash([2, 3], 0)
-          } catch (e) { /* 无虚线能力就实线 */ }
-          ctx.beginPath()
-          ctx.arc(codeCx, codeCy, 14, 0, Math.PI * 2)
-          ctx.stroke()
-          try {
-            ctx.setLineDash([], 0)
-          } catch (e) { /* 同上 */ }
-          ctx.beginPath()
-          ctx.arc(codeCx, codeCy, 6, 0, Math.PI * 2)
-          ctx.stroke()
-        }
+        // 右下角小叶枝（2026-07-19 替换太阳码：卡面不再带码，回流不靠扫码）
+        drawSprig(ctx, { x: innerX + innerW - 17, y: footTop + 24, stroke: C.leaf })
       }
       return total
     },
@@ -763,12 +785,7 @@ export default {
       ctx.save()
       roundRectPath(ctx, cardX, cardY, cardW, cardH, 4)
       ctx.clip()
-      if (p === 'rice') {
-        ctx.setFillStyle('rgba(120, 100, 60, 0.07)')
-        for (let yy = cardY + 3; yy < cardY + cardH; yy += 7) {
-          for (let xx = cardX + 3; xx < cardX + cardW; xx += 7) ctx.fillRect(xx, yy, 1, 1)
-        }
-      } else if (p === 'moss') {
+      if (p === 'moss') {
         ctx.setFillStyle('rgba(18, 71, 3, 0.11)')
         for (let yy = cardY + 8; yy < cardY + cardH; yy += 17) {
           for (let xx = cardX + 8; xx < cardX + cardW; xx += 17) {
@@ -787,9 +804,11 @@ export default {
           }
         }
       } else if (p === 'wash') {
-        // 两团极淡的径向晕：左上绿、右下金；端上没有渐变能力就保持素底（可接受的退化）
-        this.radialFill(ctx, cardX + cardW * 0.08, cardY + 8, cardW * 1.05, 'rgba(18,71,3,0.075)', 'rgba(18,71,3,0)', cardX, cardY, cardW, cardH)
-        this.radialFill(ctx, cardX + cardW, cardY + cardH, cardW, 'rgba(205,145,48,0.10)', 'rgba(205,145,48,0)', cardX, cardY, cardW, cardH)
+        // 两团径向水彩晕：左上绿、右下金（2026-07-19 加浓+收半径：原先两团半径都
+        // 盖满整卡、透明度过低，混成一色；收小半径让两色各据一角、中间留素底过渡）。
+        // 端上没有渐变能力就保持素底（可接受的退化）
+        this.radialFill(ctx, cardX + cardW * 0.12, cardY + cardH * 0.06, cardW * 0.85, 'rgba(18,71,3,0.13)', 'rgba(18,71,3,0)', cardX, cardY, cardW, cardH)
+        this.radialFill(ctx, cardX + cardW * 0.92, cardY + cardH * 0.97, cardW * 0.9, 'rgba(205,145,48,0.20)', 'rgba(205,145,48,0)', cardX, cardY, cardW, cardH)
       }
       ctx.restore()
     },

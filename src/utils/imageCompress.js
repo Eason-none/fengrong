@@ -1,10 +1,16 @@
 // 图片压缩（diary-trace 1.3/1.5）：聊天发图与存量原图迁移共用这套压缩逻辑。
-// 2026-07-15 内测反馈：分享卡照片糊。根因=卡片照片区物理宽约 280逻辑px×dpr3≈840px，
-// 300px 源图放大 2.8 倍。长边提到 900 后基本 1:1 输出；单张 ~40KB→~150KB，
-// 10MB 预算约 60 张（外置层同图去重仍有效），真机压测后再定是否分档。
+// 参数演进（都来自内测反馈"分享卡照片糊"）：
+//   300px → 900px（2026-07-15）：卡片照片区物理宽约 280逻辑px×dpr3≈840px，300px 放大 2.8 倍。
+//   900/q60 → 1200/q80（2026-07-16，polish-beta-feedback-2 D6）：900px 已够 1:1，但 q60 的
+//   JPEG 压缩伪影在满 dpr PNG 导出下可见（文字底纹清晰、照片糊）——提 q 是主刀，提边长是
+//   给 dpr≥3 大屏的余量。单张 ~150KB→~400KB，10MB 预算约 25 张（外置层同图去重仍有效）；
+//   验收标准是"卡面照片近看无块状伪影、单张 ≤450KB"，超标降回 q75 或 1100px。
+// 存量旧图不迁移不回升（原图从不落库，无从回升）。
 // 原图从不落库：ChatView只用压缩后的结果写入消息记录，原图仅存在于内存里供当次模型调用。
 
-const THUMB_MAX_EDGE = 900;
+const THUMB_MAX_EDGE = 1200;
+const THUMB_QUALITY = 80; // mp 端 uni.compressImage 的 quality（0-100）
+const THUMB_QUALITY_H5 = 0.8; // H5 端 canvas.toDataURL 的质量（0-1），与 mp 端同步提档
 
 // H5的uni.chooseImage返回的tempFilePath是blob: URL，历史遗留的旧图是data: URL——
 // 两者都能直接作Image().src用，H5端压缩因此不区分"文件路径"还是"已落库的dataURL"。
@@ -19,7 +25,7 @@ function compressViaCanvas(imgSrc) {
 			canvas.width = width;
 			canvas.height = height;
 			canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-			resolve(canvas.toDataURL("image/jpeg", 0.7));
+			resolve(canvas.toDataURL("image/jpeg", THUMB_QUALITY_H5));
 		};
 		img.onerror = () => reject(new Error("图片加载失败"));
 		img.src = imgSrc;
@@ -30,7 +36,7 @@ function compressFilePathWeixin(path) {
 	return new Promise((resolve, reject) => {
 		uni.compressImage({
 			src: path,
-			quality: 60,
+			quality: THUMB_QUALITY,
 			compressedWidth: THUMB_MAX_EDGE,
 			success: (res) => {
 				uni.getFileSystemManager().readFile({

@@ -2,7 +2,25 @@
   <!-- 卡片/邀请两步共用一个根节点（virtualHost 让它在 mp 端直接作为 .page 的 flex 子项，
        与原先内联在页面里的布局行为一致）；聊天步是全屏 ChatView -->
   <view v-if="step !== 'chat'" class="push-flow" :class="step === 'card' ? 'push-flow--fill' : 'push-flow--center'">
-    <template v-if="step === 'card'">
+    <!-- 心情小窗（add-instant-mood-fit）：可选一步，跳过与心情同层同权重；
+         选择只存本组件 data，不落 storage、不进 analytics、卡片步之后无任何回显 -->
+    <template v-if="step === 'mood'">
+      <view class="mood-step">
+        <view class="mood-step__q">你现在的心情是怎样的？</view>
+        <view class="mood-step__chips">
+          <view class="mood-step__chip" hover-class="u-press" @tap="chooseMood('down')">沮丧</view>
+          <view class="mood-step__chip" hover-class="u-press" @tap="chooseMood('restless')">烦躁</view>
+          <view class="mood-step__chip" hover-class="u-press" @tap="chooseMood('bored')">无聊</view>
+          <view class="mood-step__chip" hover-class="u-press" @tap="chooseMood('energetic')">活力</view>
+        </view>
+        <view class="mood-step__chip mood-step__chip--wide" hover-class="u-press" @tap="chooseMood(null)">
+          都不是，随便来一件
+        </view>
+        <view class="push-flow__back-link" hover-class="u-press" @tap="close">← 返回</view>
+      </view>
+    </template>
+
+    <template v-else-if="step === 'card'">
       <view class="push-flow__stage">
         <!-- 胶带与卡片是兄弟节点：换卡时胶带先撕、卡片跟着翻走，各自独立动 -->
         <view
@@ -37,6 +55,15 @@
       </view>
 
       <view v-if="task" class="push-flow__done-btn" hover-class="u-press" @tap="markDone">做完啦</view>
+      <!-- 沮丧/烦躁的呼吸去向：卡内安静链接（2026-07-17 真机验收"二段式有打断感"，D6 降级方案） -->
+      <view
+        v-if="task && (mood === 'down' || mood === 'restless')"
+        class="push-flow__back-link mood-breathe-link"
+        hover-class="u-press"
+        @tap="breathe"
+      >
+        或者，先静一下
+      </view>
       <view class="push-flow__back-link" hover-class="u-press" @tap="close">← 返回</view>
     </template>
 
@@ -62,22 +89,24 @@
     :conversation-id="conversationId"
     :content-title="task.title"
     :instructions="task.instructions"
+    :content-hook="task.hook"
     :previous-summary="null"
     @close="close"
   />
 </template>
 
 <script>
-// 现在就来一件（instant-task）：零决策即时抽取流程，card → invite → chat 三步。
-// 原内联在 index.vue（god component 拆分，2026-07-12）；状态机与数据层调用整体搬入，
-// 页面只负责挂载/卸载与收尾（归档、刷新入口）。
+// 现在就来一件（instant-task）：即时抽取流程，mood → card → invite → chat 四步。
+// mood 步可跳过（跳过 = 与无此步时行为完全一致），选了心情才在抽取上叠心情软优先
+// （add-instant-mood-fit）。原内联在 index.vue（god component 拆分，2026-07-12）；
+// 状态机与数据层调用整体搬入，页面只负责挂载/卸载与收尾（归档、刷新入口、呼吸直通）。
 import ChatView from '@/components/ChatView.vue'
 import CompletionBeat from '@/components/CompletionBeat.vue'
 import FirstTimeHint from '@/components/FirstTimeHint.vue'
 import { getUncompletedTasks, saveCompletedTask, getTodayCompleted } from '@/state/dailyTaskPool.js'
 import { getDailyTaskCandidates } from '@/content/library.js'
 import { getBasicInfo } from '@/state/basicInfo.js'
-import { inferMomentScenes, preferMomentCandidates } from '@/state/momentInference.js'
+import { inferMomentScenes, preferMomentCandidates, preferMoodCandidates } from '@/state/momentInference.js'
 import { createCompletionEvent, COMPLETION_INVITE_TEXT } from '@/state/completionEvent.js'
 import { createConversation, getConversationByCompletionEventId } from '@/state/conversation.js'
 import { maybeSilentTopup } from '@/utils/silentTopup.js'
@@ -92,10 +121,13 @@ export default {
     // 当日卡片已取的天气文本（软优先的天气亲和用），没有就整层跳过，不发请求
     weatherText: { type: String, default: null },
   },
-  emits: ['completed', 'close'],
+  emits: ['completed', 'close', 'breathe'],
   data() {
     return {
-      step: 'card', // 'card' | 'invite' | 'chat'
+      step: 'mood', // 'mood' | 'card' | 'invite' | 'chat'
+      // 心情只活在本次流程的组件 data 里：关闭即弃，无预选、无回显、无持久化、无上报
+      mood: null, // null | 'down' | 'restless' | 'bored' | 'energetic'
+      shownIds: [], // 本次流程内已展示过的条目 id——"换一个"不回头（关闭即弃）
       task: null,
       refreshCount: 0,
       exhausted: false,
@@ -106,28 +138,43 @@ export default {
       inviteText: COMPLETION_INVITE_TEXT,
     }
   },
-  created() {
-    this.task = this.pickTask()
-  },
   methods: {
-    // 零决策抽一条，排除已领取和今日已完成的（add-instant-moment-fit）：
+    // mood 步一律直接抽卡；跳过（mood=null）= 与本变更前行为完全一致。
+    // 沮丧/烦躁的呼吸去向在任务卡内以链接呈现（不再二段式分岔）。
+    chooseMood(mood) {
+      this.mood = mood
+      this.enterCard()
+    },
+    enterCard() {
+      this.task = this.pickTask()
+      this.step = 'card'
+    },
+    // 先静一下：交给页面打开既有呼吸覆盖层（"静一下"同一通道），本流程关闭且不留任何记录
+    breathe() {
+      this.$emit('breathe')
+    },
+    // 抽一条，排除已领取、今日已完成、以及本次流程内已展示过的（"换一个"不回头）：
     // 时刻推断先缩小场景（深夜只出 home 等），交集/候选为空即回落档案标签，永不因推断空手；
-    // 再在候选里软优先命中此刻的打标条目。
-    pickTask(extraExcludeId) {
+    // 候选内先按时刻软优先排序，再叠心情软优先在外层（用户显式说出的信号 > 系统推断的信号）。
+    // 「活力」跳过时刻收窄直接用档案标签——推断偏就地（深夜=home 等），会把真出门条目
+    // 挡在候选窗外，软优先在排序层压不过获取层过滤（2026-07-17 真机验收修订）。
+    pickTask() {
       const excludeIds = [
         ...getUncompletedTasks().map((t) => t.id),
         ...getTodayCompleted().map((t) => t.id),
+        ...this.shownIds,
       ]
-      if (extraExcludeId) excludeIds.push(extraExcludeId)
       const profileTags = getBasicInfo().scene_tags || []
       const now = new Date()
-      const momentTags = inferMomentScenes(now, profileTags)
+      const momentTags = this.mood === 'energetic' ? null : inferMomentScenes(now, profileTags)
       let candidates = getDailyTaskCandidates(momentTags ?? profileTags, excludeIds, 12)
       if (!candidates.length && momentTags) {
         candidates = getDailyTaskCandidates(profileTags, excludeIds, 12)
       }
       if (!candidates.length) return null
-      return preferMomentCandidates(candidates, now, this.weatherText)[0]
+      const picked = preferMoodCandidates(preferMomentCandidates(candidates, now, this.weatherText), this.mood)[0]
+      this.shownIds.push(picked.id)
+      return picked
     },
     // "换一个"最多3次；第4次点击不再换，露出关怀小字——沿用旧推送层"把限制说成关心"的立场。
     // 换卡 = 撕胶带四拍编排：撕胶带(0-420ms) → 卡片翻走(100-620ms) → 620ms 换数据 →
@@ -147,7 +194,7 @@ export default {
           return
         }
         // 池子见底抽不出新卡时保留当前卡——视觉上等于"撕下来又贴了回去"
-        this.task = this.pickTask(this.task.id) ?? this.task
+        this.task = this.pickTask() ?? this.task
         this.swapPhase = 'entering'
         setTimeout(() => {
           this.swapPhase = null
@@ -192,4 +239,44 @@ export default {
 
 <style>
 @import '../styles/push-flow.css';
+
+/* 心情小窗（add-instant-mood-fit）：只在即时流程用，不进共享 push-flow.css。
+   跳过项与心情 chip 同款式同权重（一等公民）；布局用 margin 不用 flex gap（华为兼容）。 */
+.mood-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.mood-step__q {
+  font-size: 30rpx;
+  color: var(--c-ink);
+  margin-bottom: 28rpx;
+}
+
+.mood-step__chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: 100%;
+  max-width: 520rpx;
+}
+
+.mood-step__chip {
+  box-sizing: border-box;
+  min-width: 200rpx;
+  margin: 12rpx;
+  padding: 20rpx 36rpx;
+  text-align: center;
+  font-size: 28rpx;
+  color: var(--c-ink);
+  background: var(--c-card);
+  border: 1rpx solid var(--c-border-s);
+  border-radius: 999rpx;
+}
+
+.mood-step__chip--wide {
+  margin-top: 12rpx;
+}
 </style>

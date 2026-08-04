@@ -12,7 +12,12 @@
       <view>
         <view class="collection-grid__top">
           <view class="collection-grid__type">{{ typeLabel(entry.collection.collection_type) }}</view>
-          <view class="collection-grid__pip" :class="`collection-grid__pip--${entry.state.status}`"></view>
+          <!-- 主题徽标（2026-07-16 定稿）：Twemoji PNG 内置图片，替代原状态点——emoji 字符在
+               华为等机型字体缺字/走形，图片是唯一跨机型一致的 emoji 呈现。状态三档：
+               locked 降透明（mp 端 filter:grayscale 不可靠不用）、active 彩色、completed 金色圆底。 -->
+          <view class="collection-grid__badge" :class="`collection-grid__badge--${entry.state.status}`">
+            <image class="collection-grid__badge-img" :src="`/static/icons/tujian/${entry.collection.id}.png`" mode="aspectFit" />
+          </view>
         </view>
         <view class="collection-grid__name">{{ entry.collection.name }}</view>
         <view v-if="entry.state.status !== 'locked'" class="collection-grid__intro">{{ entry.collection.intro }}</view>
@@ -68,10 +73,13 @@ export default {
 </script>
 
 <style>
+/* 双列不用 flex gap、卡宽不用 calc(%±rpx)：华为/鸿蒙内核对两者支持不稳，
+   calc 失效后卡片塌成内容宽的单列（2026-07-16 内测反馈①）。
+   48% + space-between 的列距（~4%）与原 20rpx 视觉无差。 */
 .collection-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 20rpx;
+  justify-content: space-between;
   padding: 0 24rpx;
   width: 100%;
   box-sizing: border-box;
@@ -82,7 +90,8 @@ export default {
    active   = 贴上去的标本卡，绿色标记
    completed= 烫金的一页，全 app 唯一的金色时刻 */
 .collection-grid__card {
-  width: calc(50% - 10rpx);
+  width: 48%;
+  margin-bottom: 20rpx;
   min-height: 276rpx;
   padding: 28rpx;
   border-radius: 28rpx;
@@ -131,19 +140,33 @@ export default {
   letter-spacing: 0.12em;
 }
 
-.collection-grid__pip {
-  width: 14rpx;
-  height: 14rpx;
+.collection-grid__badge {
+  width: 44rpx;
+  height: 44rpx;
   border-radius: 50%;
-  background: var(--c-border-s);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
 }
 
-.collection-grid__pip--active {
-  background: var(--c-primary);
+.collection-grid__badge-img {
+  width: 36rpx;
+  height: 36rpx;
 }
 
-.collection-grid__pip--completed {
+.collection-grid__badge--locked {
+  opacity: 0.4;
+}
+
+/* 点亮=金色圆底（用户定稿：不加金环），金只属于完成时刻的既有语义 */
+.collection-grid__badge--completed {
   background: var(--c-accent);
+}
+
+.collection-grid__badge--completed .collection-grid__badge-img {
+  width: 30rpx;
+  height: 30rpx;
 }
 
 .collection-grid__name {

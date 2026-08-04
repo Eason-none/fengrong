@@ -26,6 +26,10 @@
       </view>
     </view>
 
+    <!-- 三组场景的目的说明（2026-07-17 用户定稿）：说"为什么问"而不是"不选的后果"——
+         机制不进 UI 文案，空档案的引导已有卡片底部"去完善你的信息"承担 -->
+    <view class="basic-info__scene-note">小事会照着这些地方来找你——按真实生活勾就好。不选也能用，但是可能会对“来件小事”有点小影响~</view>
+
     <view class="basic-info__field">
       <text class="basic-info__label">主要待的地方</text>
       <view class="basic-info__tags">
@@ -157,6 +161,14 @@ export default {
   font-size: 26rpx;
   color: var(--c-muted);
   margin-bottom: 16rpx;
+}
+
+/* 场景组前的目的说明：比 label 更轻一档，管住下面三组 */
+.basic-info__scene-note {
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: var(--c-subtle);
+  margin-bottom: 20rpx;
 }
 
 .basic-info__input {

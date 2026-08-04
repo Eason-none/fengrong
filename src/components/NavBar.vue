@@ -1,6 +1,12 @@
 <template>
   <view class="nav-badge" @tap="open">
-    <text class="nav-badge__icon">⚙</text>
+    <!-- 调节杆图标：纯 CSS 绘制。字符/emoji 图标依赖系统字体，华为端 U+2699 按文本字形渲染走形
+         （2026-07-16 内测反馈①）；与手记册 .dn-book 同一套线条语言（2rpx 描边、--c-subtle 单色）。 -->
+    <view class="nav-badge__icon">
+      <view class="nav-badge__bar"><view class="nav-badge__dot nav-badge__dot--1"></view></view>
+      <view class="nav-badge__bar"><view class="nav-badge__dot nav-badge__dot--2"></view></view>
+      <view class="nav-badge__bar"><view class="nav-badge__dot nav-badge__dot--3"></view></view>
+    </view>
   </view>
 
   <view v-if="visible" class="nav-badge__overlay" @tap="close">
@@ -99,7 +105,10 @@ const PRIVACY_POLICY_TEXT = `隐私政策
 不收集你的通讯录、不追踪你的位置轨迹、不将你的信息出售给第三方。
 
 七、政策更新与联系方式
-本政策可能随功能调整而更新。如对隐私有疑问，可发送邮件至 yixin20011010@163.com 与我们联系。`
+本政策可能随功能调整而更新。如对隐私有疑问，可发送邮件至 yixin20011010@163.com 与我们联系。
+
+附：素材署名
+本产品的图鉴主题图标使用开源图标集 Twemoji（Copyright Twitter, Inc and other contributors），依 CC-BY 4.0 许可使用。`
 
 export default {
   name: 'NavBar',
@@ -244,12 +253,43 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* 强制独立合成层：部分安卓 WebView（2026-07-19 真机反馈，图鉴页）滚动时 fixed 元素
+     若无自身图层会跟着内容漂移、停下才弹回。translateZ(0) 不改变布局与点击区域。 */
+  transform: translateZ(0);
+  will-change: transform;
 }
 
+/* 调节杆（设置隐喻）：三道横杆 + 错落滑钮，滑钮底色用卡片色盖住杆线形成"穿杆"效果 */
 .nav-badge__icon {
-  font-size: 36rpx;
-  color: var(--c-subtle);
+  width: 34rpx;
+  height: 30rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
+
+.nav-badge__bar {
+  position: relative;
+  height: 2rpx;
+  background: var(--c-subtle);
+  opacity: 0.9;
+}
+
+.nav-badge__dot {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10rpx;
+  height: 10rpx;
+  border-radius: 50%;
+  border: 2rpx solid var(--c-subtle);
+  background: var(--c-bg);
+  box-sizing: border-box;
+}
+
+.nav-badge__dot--1 { left: 5rpx; }
+.nav-badge__dot--2 { left: 19rpx; }
+.nav-badge__dot--3 { left: 10rpx; }
 
 .nav-badge__overlay {
   position: fixed;

@@ -12,6 +12,9 @@ export function getDailyTaskById(id) {
 	return dailyTasksRaw.find((t) => t.id === id);
 }
 
+// 图鉴主题图标不在数据层：emoji 字符方案已废弃（真机上任何 emoji 字符都可能缺字/走形），
+// 定稿为 Twemoji PNG 内置图片（static/icons/tujian/<collection_id>.png），
+// CollectionGrid 按 id 直接拼路径展示，数据层无感知。
 export function getAllCollections() {
 	return rawLibrary.collections;
 }

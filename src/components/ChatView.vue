@@ -66,11 +66,21 @@
     </view>
 
     <view class="chat__input-row">
-      <view class="chat__image-btn" hover-class="u-press" @tap="chooseImage">📷</view>
+      <!-- 线条相机：纯 CSS 绘制。📷 在部分机型 emoji 字体缺字形显示为空白（2026-07-16 内测反馈②），
+           与设置调节杆/手记册小书同一套线条语言。 -->
+      <view class="chat__image-btn" hover-class="u-press" @tap="chooseImage">
+        <view class="cam">
+          <view class="cam__bump"></view>
+          <view class="cam__body"><view class="cam__lens"></view></view>
+        </view>
+      </view>
+      <!-- cursor-spacing：键盘弹起时输入框底边与键盘顶的距离。默认 0 会把页面只顶到
+           输入框本体刚露出，行内 32rpx 底衬全被键盘压住（2026-07-19 真机反馈：贴死键盘太紧凑） -->
       <input
         class="chat__input"
         v-model="inputText"
         placeholder="说说看，不说也可以"
+        cursor-spacing="20"
         :disabled="sending || finishing"
       />
       <view class="chat__send-btn" hover-class="u-press" @tap="send">发送</view>
@@ -107,6 +117,8 @@ export default {
   props: {
     conversationId: { type: String, required: true },
     contentTitle: { type: String, required: true },
+    // 开场话头（条目 hook，若有）：让开场白从"问感受"升级为"回指具体细节"
+    contentHook: { type: String, default: null },
     instructions: { type: String, required: true },
     previousSummary: { type: String, default: null },
     // 三件幸福小事等非"见证一件丰容小事"框架的对话用这两个覆盖默认的开场白/system prompt
@@ -148,6 +160,9 @@ export default {
     // （diary-conversation：问细节而非问感受——细节才是未来能唤起记忆的钩子）。不调API、永远可用。
     openingText() {
       if (this.openingTextOverride) return this.openingTextOverride
+      if (this.contentHook && this.contentHook.trim()) {
+        return `你刚才「${this.contentTitle}」。${this.contentHook.trim()}——想到什么都可以聊聊。`
+      }
       return `你刚才「${this.contentTitle}」——有没有什么瞬间、颜色、声音，或者哪个细节，让你多看了一眼？想到什么都可以聊聊。`
     },
   },
@@ -327,9 +342,15 @@ export default {
 .chat {
   display: flex;
   flex-direction: column;
-  width: 100%;
-  height: 100%;
-  position: relative;
+  /* 真全屏接管（2026-07-19）：四个宿主都把聊天当全屏步渲染，但页面流里 height:100%
+     在父链上拿不到确定高度，输入行会停在半空（头部+定高消息区不满一屏）。
+     fixed 铺满视口后 flex 才有确定高度可分，输入行天然贴底。 */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--c-bg);
 }
 
 .chat__header {
@@ -352,7 +373,9 @@ export default {
 }
 
 .chat__messages {
-  height: 800rpx;
+  /* 占满头部与输入行之间的全部剩余高度（原 800rpx 定高是输入行不贴底的根因） */
+  flex: 1;
+  min-height: 0;
   padding: 0 20rpx;
 }
 
@@ -540,14 +563,55 @@ export default {
   align-items: center;
   padding: 20rpx 20rpx 32rpx;
   border-top: 1rpx solid var(--c-border);
-  /* 键盘弹起顶页时，底部这段留白就是输入行与键盘的分离带——内测截图里输入行底边
-     贴死键盘顶（零间距），"对齐或分离"里选分离。全面屏底部再叠加安全区。 */
+  /* 静止时底部留白 = 32rpx 呼吸 + 全面屏安全区；键盘弹起时与键盘的分离带
+     由 input 的 cursor-spacing 保证（adjust-position 顶页只认输入框本体，不认这段 padding） */
   padding-bottom: calc(32rpx + env(safe-area-inset-bottom));
 }
 
 .chat__image-btn {
   margin-right: 16rpx;
-  font-size: 32rpx;
+  padding: 8rpx 4rpx;
+}
+
+.cam {
+  position: relative;
+  width: 40rpx;
+  height: 36rpx;
+}
+
+.cam__bump {
+  position: absolute;
+  top: 0;
+  left: 13rpx;
+  width: 14rpx;
+  height: 9rpx;
+  border: 2rpx solid var(--c-subtle);
+  border-bottom: none;
+  border-radius: 4rpx 4rpx 0 0;
+  box-sizing: border-box;
+}
+
+.cam__body {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 7rpx;
+  bottom: 0;
+  border: 2rpx solid var(--c-subtle);
+  border-radius: 6rpx;
+  background: var(--c-bg);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cam__lens {
+  width: 14rpx;
+  height: 14rpx;
+  border: 2rpx solid var(--c-subtle);
+  border-radius: 50%;
+  box-sizing: border-box;
 }
 
 .chat__input {

@@ -25,9 +25,9 @@ function assertTrue(condition, label) {
 	}
 }
 
-// 1. 每日任务池：69条（合并后77，经 v8.4 条件四审计删改后现存69），id 唯一，scene_tags 全部合法
+// 1. 每日任务池：66条（合并后77 → v8.4 审计后69 → 2026-08-04 审计后66），id 唯一，scene_tags 全部合法
 const VALID_TAGS = ["workspace", "classroom", "home", "transit", "walking", "driving", "convenience-store", "canteen", "gym", "market", "general"];
-assertEqual(dailyTasks.length, 69, "每日任务池共69条");
+assertEqual(dailyTasks.length, 66, "每日任务池共66条（2026-08-04 审计：删 push_007/push_013/push_033）");
 assertEqual(new Set(dailyTasks.map((t) => t.id)).size, dailyTasks.length, "每日任务池id全部唯一");
 assertTrue(
 	dailyTasks.every((t) => Array.isArray(t.scene_tags) && t.scene_tags.length > 0 && t.scene_tags.every((tag) => VALID_TAGS.includes(tag))),
@@ -55,6 +55,16 @@ assertEqual(
 	JSON.stringify(["dt-002", "dt-013", "dt-018", "dt-046", "push_026", "push_031"]),
 	"打标条目恰为定稿的 6 条（其余 63 条保持无标）"
 );
+// gate0 类别标（add-instant-mood-fit）：缺省或恰为 "A"/"B"；无标恰为复核明细表定稿的 4 条
+assertTrue(
+	dailyTasks.every((t) => t.gate0 === undefined || t.gate0 === "A" || t.gate0 === "B"),
+	'gate0 字段缺省或取值恰为 "A"/"B"'
+);
+assertEqual(
+	JSON.stringify(dailyTasks.filter((t) => t.gate0 === undefined).map((t) => t.id).sort()),
+	JSON.stringify(["dt-013", "dt-018", "dt-049", "push_014"]),
+	"gate0 无标条目恰为不强判的 4 条（其余 65 条均已誊写）"
+);
 
 // 2. 图鉴：8个已建图鉴（2026-07-11同步：角落图鉴、物件图鉴已删除，时间实验图鉴并入城市探索图鉴，颜色图鉴+2条光影主题，自然接触图鉴+1条），条目数与已知齐全
 const collections = library.getAllCollections();
@@ -75,6 +85,13 @@ for (const [id, expected] of Object.entries(expectedCollections)) {
 	assertTrue(!!collection, `图鉴 ${id} 存在`);
 	assertEqual(collection.name, expected.name, `图鉴 ${id} 名称正确`);
 	assertEqual(collection.items.length, expected.count, `图鉴 ${id} 条目数正确`);
+}
+
+// 2.5 图鉴主题徽标（polish-beta-feedback-2 D8 修订版）：每本图鉴有对应的内置 Twemoji PNG
+//（emoji 字符方案已废弃——真机字体缺字/走形；图片是唯一跨机型一致的呈现）
+import { existsSync } from "node:fs";
+for (const id of Object.keys(expectedCollections)) {
+	assertTrue(existsSync(new URL(`../src/static/icons/tujian/${id}.png`, import.meta.url)), `图鉴 ${id} 的徽标 PNG 存在`);
 }
 
 // 3. 已知条目id可查

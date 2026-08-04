@@ -1,6 +1,12 @@
 <template>
   <view class="breathing" :class="{ 'breathing--leaving': leaving }">
-    <view class="breathing__intro">这里每天有一些小事，去做做看，感受一下就够了。</view>
+    <!-- 首启（welcome）这一屏对新用户是"进错 App 了吗"的高危时刻：第一行认址（这是丰容），
+         第二行把呼吸解释成有意为之的门槛仪式（2026-07-17 用户反馈：无说明的呼吸开场令人困惑）。
+         「静一下」覆盖层是用户主动进来的，不需要欢迎与解释，只留一句轻引导。 -->
+    <view v-if="welcome" class="breathing__welcome">欢迎来到丰容</view>
+    <view class="breathing__intro">{{ welcome
+      ? '开始之前，先一起做个深呼吸，把节奏慢下来——这里的事都不着急。'
+      : '先做个深呼吸，把节奏慢下来。' }}</view>
 
     <view class="breathing__stage">
       <view class="breathing__glow"></view>
@@ -15,13 +21,15 @@
 
     <!-- 节奏点：每秒柔和点亮一颗（数量=阶段秒数），给"这个阶段走到哪了"的进度感。
          刻意不用数字倒计时——数字给的是精度，带来的是紧张感（内测反馈：第一遍跟不上，
-         但平时的倒计时又让人紧张）。屏息7s原本完全静止，是最容易失去节奏感的一段。 -->
+         但平时的倒计时又让人紧张）。屏息7s原本完全静止，是最容易失去节奏感的一段。
+         点亮由 CSS animation-delay 驱动（渲染层调度）：定时器链在低端机被主线程动画
+         挤占时点得不匀（2026-07-16 内测反馈③）；beatsRun 换 key 重挂节点触发每阶段重放。 -->
     <view class="breathing__beats" :class="{ 'breathing__beats--visible': beats > 0 }">
       <view
         v-for="k in beats"
-        :key="k"
+        :key="beatsRun + '-' + k"
         class="breathing__beat"
-        :class="{ 'breathing__beat--lit': k <= beatsLit }"
+        :style="{ animationDelay: (k - 1) + 's' }"
       ></view>
     </view>
 
@@ -41,17 +49,36 @@
     <view v-if="started && !leaving" class="breathing__sound" hover-class="u-press" @tap="toggleSound">
       {{ soundOn ? '海浪声 开' : '海浪声 关' }}
     </view>
+
+    <!-- 误点者的安全门：进行中常驻、随时可走，与「跳过」同一收束路径，无挽留无确认
+         （breathing-entry「引导进行中可退出」，2026-07-16 内测反馈③） -->
+    <view v-if="started && !leaving" class="breathing__exit" hover-class="u-press" @tap="skip">先不做了</view>
   </view>
 </template>
 
 <script>
 import { maybeSilentTopup } from '@/utils/silentTopup.js'
+import { get, set, KEYS } from '@/state/storage.js'
+// #ifdef MP-WEIXIN
+import { getBreathingAudioUrl } from '@/api/cloudFn.js'
+// #endif
+
+// 海浪声音源：微信云存储（polish-beta-feedback-2 D5）。打包内置的 1.2MB mp3 已移除——
+// 占主包体积，且真机上本地路径加载失败（2026-07-16 内测反馈③无声）。
+// 临时 URL 由云函数签发（存储 ACL"仅创建者可读写"挡客户端直连，免费套餐不可改；
+// 管理端权限不受限，fileID 收在云函数侧）；取 URL 失败一律静默降级为无声引导。
+const AUDIO_URL_MAX_AGE_S = 3 * 24 * 3600 // 与云函数签发时长一致
+const AUDIO_URL_MIN_REMAIN_MS = 24 * 3600 * 1000 // 缓存剩余有效期不足 1 天即重取（过期边界提前量，spec: 临时 URL 缓存复用）
 
 // 呼吸引导服务体验、不是流程门槛：「跳过」随时立即离开。「我准备好了」按 ui-flow.html 的
 // 4-7-8 引导跑两轮（吸气4s / 屏息7s / 呼气8s）后自动进入下一步——用 :style 绑定 + 定时器链
 // 复刻原型的圆圈缩放与阶段文字（小程序端不能像原型那样直接操作 DOM）。
 export default {
   name: 'BreathingGuide',
+  props: {
+    // 首启前置流程传 true：显示「欢迎来到丰容」+ 解释为什么先呼吸；「静一下」覆盖层不传
+    welcome: { type: Boolean, default: false },
+  },
   emits: ['done'],
   data() {
     return {
@@ -65,7 +92,7 @@ export default {
       circleTransition: 'transform 4s ease-in-out',
       leaving: false,
       beats: 0, // 当前阶段节奏点总数（=阶段秒数），0=未开始不显示
-      beatsLit: 0, // 已点亮颗数
+      beatsRun: 0, // 阶段计数，换 key 重挂节奏点节点让 CSS 动画从头重放
       soundOn: true, // 环境音开关（会话内有效，不持久化）
     }
   },
@@ -73,6 +100,9 @@ export default {
     this.timers = []
     this.audio = null // InnerAudioContext 原生对象，不进响应式
     this.fadeTimer = null
+    this.audioVolume = 0 // JS 侧音量记账：部分安卓机 ctx.volume 读回不可靠（读到 undefined 会让淡入算出 NaN 卡死在无声）
+    // 预取音频 URL：起播前大概率已就绪（失败=null，无声降级），Promise 不进响应式
+    this.audioUrlPromise = this.resolveAudioUrl()
   },
   beforeUnmount() {
     this.clearTimers()
@@ -102,31 +132,62 @@ export default {
         this.$emit('done')
       }, 600)
     },
+    // 云存储临时 URL：缓存命中且剩余有效期充足直接复用，否则请云函数重签并回写缓存。
+    // 任何一步失败 resolve null——声音是氛围不是机制，绝不报错打扰（日志进控制台供排查）。
+    resolveAudioUrl() {
+      // #ifdef MP-WEIXIN
+      const cached = get(KEYS.BREATHING_AUDIO_URL, null)
+      if (cached && cached.url && cached.expireAt - Date.now() > AUDIO_URL_MIN_REMAIN_MS) {
+        return Promise.resolve(cached.url)
+      }
+      return getBreathingAudioUrl().then((url) => {
+        if (url) set(KEYS.BREATHING_AUDIO_URL, { url, expireAt: Date.now() + AUDIO_URL_MAX_AGE_S * 1000 })
+        return url
+      })
+      // #endif
+      // #ifndef MP-WEIXIN
+      return Promise.resolve(null) // H5 已停维护：无环境音
+      // #endif
+    },
     // 环境音：起播挂在"我准备好了"这个用户手势上（自动播放策略要求），
     // 2s 淡入到 0.5——海浪不该"啪"地出现。iOS 静音键保持默认跟随（静音场景合理）。
+    // URL 预取在 created；未就绪时最多晚几百 ms 起播，落在 2s 淡入的缓冲里。
     startAudio() {
-      const ctx = uni.createInnerAudioContext()
-      ctx.src = '/static/audio/breathing-sea.mp3'
-      ctx.loop = true
-      ctx.volume = 0
-      ctx.onError((err) => {
-        // 音频失败静默降级为无声引导——声音是氛围不是机制，绝不报错打扰
-        console.error('breathing audio failed:', err)
+      const urlPromise = this.audioUrlPromise || this.resolveAudioUrl()
+      urlPromise.then((url) => {
+        // 等 URL 期间用户可能已退出/离场：不再起播
+        if (!url || !this.started || this.leaving || this.audio) return
+        const ctx = uni.createInnerAudioContext()
+        ctx.src = url
+        ctx.loop = true
+        ctx.volume = 0
+        this.audioVolume = 0
+        ctx.onError((err) => {
+          // 音频失败静默降级为无声引导
+          console.error('[breathing-audio] 播放失败:', err && err.errCode, err && err.errMsg)
+        })
+        // 淡入挂在 onPlay 之后：部分安卓厂商起播前设置 volume 不生效（现象=不报错但永远无声）
+        ctx.onPlay(() => {
+          console.log('[breathing-audio] onPlay，开始淡入')
+          if (this.soundOn) this.fadeAudioTo(0.5, 2000)
+        })
+        console.log('[breathing-audio] 起播', url.slice(0, 60))
+        ctx.play()
+        this.audio = ctx
       })
-      ctx.play()
-      this.audio = ctx
-      if (this.soundOn) this.fadeAudioTo(0.5, 2000)
     },
+    // 音量全程以 this.audioVolume 记账推进，只写 ctx.volume 不读回（安卓读回不可靠）
     fadeAudioTo(target, ms) {
       clearInterval(this.fadeTimer)
       const ctx = this.audio
       if (!ctx) return
       const stepMs = 100
-      const step = (target - ctx.volume) / Math.max(1, ms / stepMs)
+      const step = (target - this.audioVolume) / Math.max(1, ms / stepMs)
       this.fadeTimer = setInterval(() => {
-        const next = ctx.volume + step
+        const next = this.audioVolume + step
         const done = step >= 0 ? next >= target : next <= target
-        ctx.volume = Math.min(1, Math.max(0, done ? target : next))
+        this.audioVolume = Math.min(1, Math.max(0, done ? target : next))
+        ctx.volume = this.audioVolume
         if (done) clearInterval(this.fadeTimer)
       }, stepMs)
     },
@@ -158,16 +219,12 @@ export default {
       this.phase = t
       this.phaseVisible = true
     },
-    // 节奏点：第1颗随阶段开始即亮，之后每秒亮一颗，阶段结束时恰好全亮。
-    // 定时器走 later()，与阶段定时器同一清理通道（跳过时 clearTimers 一并带走）。
+    // 节奏点：第1颗随阶段开始即亮（delay 0），之后每秒亮一颗，阶段结束时恰好全亮。
+    // 点亮全部由 CSS animation-delay 声明（见模板注释），这里只重置组；
+    // 无 JS 定时器，跳过/退出时无可残留（spec「中途跳过」场景天然满足）。
     startBeats(n) {
       this.beats = n
-      this.beatsLit = 1
-      for (let k = 2; k <= n; k++) {
-        this.later(() => {
-          this.beatsLit = k
-        }, (k - 1) * 1000)
-      }
+      this.beatsRun++
     },
     runCycle(count) {
       // 吸气 4s：圆圈放大
@@ -213,6 +270,13 @@ export default {
 
 .breathing--leaving {
   opacity: 0;
+}
+
+.breathing__welcome {
+  font-size: 38rpx;
+  color: var(--c-ink);
+  text-align: center;
+  margin-bottom: 20rpx;
 }
 
 .breathing__intro {
@@ -313,13 +377,16 @@ export default {
   border-radius: 50%;
   background: var(--c-border-s);
   opacity: 0.5;
-  transition: background 0.4s ease, opacity 0.4s ease;
+  animation: beat-light 0.5s ease both;
+  /* animation-delay 由模板按颗内联注入：(k-1)s */
 }
 
 /* 点亮是柔和的透明度/颜色缓变，不是"滴答"跳变——节奏可感但不催促 */
-.breathing__beat--lit {
-  background: var(--c-primary);
-  opacity: 0.55;
+@keyframes beat-light {
+  to {
+    background: var(--c-primary);
+    opacity: 0.55;
+  }
 }
 
 .breathing__hint {
@@ -364,6 +431,16 @@ export default {
   margin-top: 56rpx;
   font-size: 22rpx;
   color: var(--c-subtle);
+  padding: 12rpx 24rpx;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+
+/* 退出入口视觉权重低于环境音开关：更淡、不加边框，是安全门不是常规操作 */
+.breathing__exit {
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: var(--c-subtle);
+  opacity: 0.72;
   padding: 12rpx 24rpx;
   transition: transform 0.12s ease, opacity 0.12s ease;
 }

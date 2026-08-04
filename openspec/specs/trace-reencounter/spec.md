@@ -4,7 +4,7 @@
 TBD - created by archiving change add-diary-trace-system. Update Purpose after archive.
 ## Requirements
 ### Requirement: 重逢弹层展示日记页
-系统 SHALL 提供统一的重逢弹层（底部弹层），展示一页日记：完成日期（"10月14日 · 傍晚"粒度）、条目标题、"那天你说："引导语 + 摘要原文、照片缩略图（`photo_thumb` 非空时）。弹层 SHALL NOT 包含任何评价性文案、计数或"分享"入口。
+系统 SHALL 提供统一的重逢弹层（底部弹层），展示一页日记：完成日期（"10月14日 · 傍晚"粒度）、条目标题、"那天你说："引导语 + 摘要原文、照片缩略图（`photo_thumb` 非空时）。弹层 SHALL NOT 包含任何评价性文案或计数；SHALL NOT 包含主动弹出式的分享引导。弹层页脚 MAY 常驻一处安静的「保存这一页」文字入口（与「← 返回」同级样式，行为见 share-card 能力），该入口 SHALL NOT 使用按钮强调样式、SHALL NOT 附带任何红点或动效提示。
 
 #### Scenario: 完整日记页展示
 - **WHEN** 用户点开一条有摘要有照片的痕迹
@@ -13,6 +13,10 @@ TBD - created by archiving change add-diary-trace-system. Update Purpose after a
 #### Scenario: 无照片的页
 - **WHEN** 用户点开一条有摘要无照片的痕迹
 - **THEN** 弹层正常显示文字内容，不出现照片占位或"没有照片"暗示
+
+#### Scenario: 保存入口安静常驻
+- **WHEN** 用户打开任意重逢弹层
+- **THEN** 页脚存在「保存这一页」文字入口，无高亮、无动效、无引导气泡
 
 ### Requirement: 图鉴已锁定条目点开可重逢
 图鉴详情中已锁定条目（已聊过/已归档）SHALL 不再对点击无响应：存在日记页时点击 SHALL 打开重逢弹层。无日记页（跳过聊聊、或聊了但无实质内容）的已完成条目 SHALL 维持无响应，且 SHALL NOT 出现任何"缺页"视觉暗示（无空格子原则）。
@@ -42,4 +46,19 @@ TBD - created by archiving change add-diary-trace-system. Update Purpose after a
 #### Scenario: 无主动重提
 - **WHEN** 用户任意一次打开应用、打开日推卡片、进入任何 tab
 - **THEN** 系统不主动展示任何历史日记页内容或"你有 N 页记录"类提示
+
+### Requirement: 弹层可选相邻翻页
+TracePage SHALL 支持可选的相邻翻页上下文：当调用方提供邻页序列时，弹层内左右滑 SHALL 沿全册 completed_at 时间线切换日记页（往回划=更早一页，往前划=更晚一页，跨月连续，到达两端时停止）。调用方未提供邻页上下文时，TracePage 的行为 SHALL 与现状完全一致（单页展示，左右滑无响应）——CollectionDetail 与三件幸福小事入口 SHALL 保持零改动的单页调用。
+
+#### Scenario: 手记册场景连续翻页
+- **WHEN** 手记册以邻页上下文打开某页日记，用户在弹层内往回划
+- **THEN** 弹层切换为时间上更早的一页（可跨月），日期/标题/照片/正文同步更新
+
+#### Scenario: 既有调用方行为不变
+- **WHEN** 用户从图鉴条目或三件幸福小事入口打开重逢弹层并左右滑动
+- **THEN** 弹层不切换页面，展示与本变更实施前完全一致
+
+#### Scenario: 翻到全册尽头
+- **WHEN** 弹层当前已是全册最早（或最晚）的一页，用户继续往对应方向划
+- **THEN** 页面不切换，不出现任何"到头了"的计数或进度提示
 

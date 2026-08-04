@@ -43,7 +43,7 @@
 
     <DiaryNotebook v-if="showDiaryNotebook" @close="showDiaryNotebook = false" />
 
-    <BreathingGuide v-if="!breathingDone" @done="onBreathingDone" />
+    <BreathingGuide v-if="!breathingDone" welcome @done="onBreathingDone" />
     <template v-else>
       <!-- 主区域（remove-pushflow：场景三选已移除，场景信息来自档案 scene_tags） -->
       <template v-if="!flowActive">
@@ -132,12 +132,13 @@
         @close="onDailyFlowClose"
       />
 
-      <!-- 现在就来一件（InstantFlow：card → invite → chat，同上拆分） -->
+      <!-- 现在就来一件（InstantFlow：mood → card → invite → chat，同上拆分） -->
       <InstantFlow
         v-if="instantActive"
         :weather-text="cardWeatherText"
         @completed="onFlowCompleted"
         @close="onInstantClose"
+        @breathe="onInstantBreathe"
       />
 
       <!-- 三件幸福小事：聊即是做，专用开场白+system prompt（three-good-things） -->
@@ -169,6 +170,8 @@
       @go-basic-info="openBasicInfoFromCard"
       @clear-completed="onClearCompleted"
       @chat-completed="chatCompletedTask"
+      @go-explore="onCardGoExplore"
+      @open-three-good-things="onCardOpenThreeGoodThings"
     />
 
     <!-- 静一下：覆盖层复用呼吸引导，用完即走，不留任何状态/记录/埋点 -->
@@ -232,8 +235,9 @@ function hasPriorUsage() {
   return hasBasicInfo || hasCompletionEvents
 }
 
-// 扉页标注语料（首页底部压花下的每日一句，"采集标注"叙事）。
-// 正式语料 25 句（2026-07-13 产品定稿，点叶子刮风轮换）。每日固定一句，不随进入次数变化。
+// 扉页标注语料（首页底部压花下的一句，"采集标注"叙事）。正式语料 25 句。
+// 每次回到首页（onShow）随机换一句（2026-07-16 内测反馈⑦定稿：进页 surprise；
+// 原为当日种子句、同一天固定），点叶子刮风在此基础上按序轮换。
 const FLYLEAF_LINES = [
   '你的存在即是意义',
   '忧虑就像为自己不想要的东西祈祷',
@@ -321,7 +325,7 @@ export default {
       // 压花的风：点植物 → 叶片摇曳 + 标语随风换句
       windActive: false,
       lineFading: false,
-      lineIndex: null, // null = 用当日种子句；点过之后按序轮换（仅会话内，不持久化）
+      lineIndex: Math.floor(Math.random() * FLYLEAF_LINES.length), // 进页随机起点，onShow 每次重掷；点叶子按序轮换（不持久化）
     }
   },
   computed: {
@@ -329,10 +333,9 @@ export default {
     flowActive() {
       return !!this.dailyFlow || this.instantActive || !!this.threeGoodThingsStep
     },
-    // 当日一句：日期确定性取模，同一天进多少次都是同一句；刮过风后从它开始轮换
+    // 进页随机的一句；刮过风后从它开始按序轮换
     currentLine() {
-      const seedIndex = Number(getTodayDateStr().replace(/-/g, '')) % FLYLEAF_LINES.length
-      return FLYLEAF_LINES[this.lineIndex ?? seedIndex]
+      return FLYLEAF_LINES[this.lineIndex]
     },
     // ---- 手记册首启引导的定位样式（图标位置运行时量测，量测失败退化为无孔纯蒙层+居中卡） ----
     guideMaskStyle() {
@@ -359,6 +362,8 @@ export default {
     },
   },
   onShow() {
+    // 标语每次回到首页都重掷一句（含从对话/分享等页面返回）——"每次点开都不同"的 surprise
+    this.lineIndex = Math.floor(Math.random() * FLYLEAF_LINES.length)
     this.refreshMyTasks()
     this.refreshCompleted()
     this.refreshDiaryEntry()
@@ -440,9 +445,8 @@ export default {
       if (this.windActive) return
       this.windActive = true
       this.lineFading = true
-      const seedIndex = Number(getTodayDateStr().replace(/-/g, '')) % FLYLEAF_LINES.length
       setTimeout(() => {
-        this.lineIndex = ((this.lineIndex ?? seedIndex) + 1) % FLYLEAF_LINES.length
+        this.lineIndex = (this.lineIndex + 1) % FLYLEAF_LINES.length
         this.lineFading = false
       }, 300)
       setTimeout(() => {
@@ -534,6 +538,15 @@ export default {
     closeDailyCard() {
       this.showDailyCard = false
     },
+    // 疲惫态软出口（polish-daily-refresh-limit）：卡片是 overlay，关闭责任在宿主页，先关再跳
+    onCardGoExplore() {
+      this.closeDailyCard()
+      uni.switchTab({ url: '/pages/explore/explore' })
+    },
+    onCardOpenThreeGoodThings() {
+      this.closeDailyCard()
+      this.openThreeGoodThings()
+    },
     onClearCompleted() {
       clearPrevDayCompleted()
       this.completedYesterday = []
@@ -590,6 +603,12 @@ export default {
       await archiveChatOnExit(payload.conversationId, payload.title, payload.instructions)
       this.refreshDiaryEntry()
     },
+    // 心情小窗"先静一下"直通呼吸（add-instant-mood-fit）：复用"静一下"覆盖层同一通道，
+    // 即时流程直接关闭（无对话无归档），全程不产生任何记录/状态/埋点
+    onInstantBreathe() {
+      this.instantActive = false
+      this.showBreathingOverlay = true
+    },
     async onDailyFlowClose(payload) {
       this.dailyFlow = null
       await archiveChatOnExit(payload.conversationId, payload.title, payload.instructions)
@@ -638,6 +657,9 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* 与 .nav-badge 同理：强制独立合成层，防部分安卓 WebView 滚动时 fixed 漂移 */
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 /* 线条小册子（纯 CSS，双端可见）：封面 + 靠左书脊 + 两道书写横线，单色 --c-subtle */
