@@ -2,6 +2,7 @@
 import { flushQueue, track } from './state/analytics.js'
 import { migrateOversizedConversationImages } from './state/imageMigration.js'
 import { dedupeCompletionSummaries } from './state/conversation.js'
+import { sweepStrandedArchives } from './utils/archiveChatOnExit.js'
 
 export default {
   onLaunch: function () {
@@ -15,8 +16,11 @@ export default {
       console.error('wx.cloud 不可用：请确认基础库版本 ≥ 2.2.3 且已开通云开发')
     }
     // #endif
-    // 存量原图迁移：一次性幂等，不阻塞启动（diary-trace 1.5）
-    migrateOversizedConversationImages().catch((err) => console.error('image migration failed:', err))
+    // 存量原图迁移：一次性幂等，不阻塞启动（diary-trace 1.5）；
+    // 归档补扫排在迁移落盘之后，避免两路同时写 CONVERSATIONS 互相覆盖
+    migrateOversizedConversationImages()
+      .catch((err) => console.error('image migration failed:', err))
+      .then(() => sweepStrandedArchives())
     // 归档竞态曾产生的重复手记页一次性收敛（幂等，无重复零写入）
     try {
       dedupeCompletionSummaries()

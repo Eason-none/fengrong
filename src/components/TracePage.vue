@@ -17,10 +17,16 @@
           class="trace-page__photo-strip-item"
         ></image>
       </scroll-view>
-      <view class="trace-page__lead">那天你说：</view>
+      <view class="trace-page__lead">那天：</view>
       <scroll-view class="trace-page__text-scroll" scroll-y>
         <text user-select selectable class="trace-page__text">{{ current.summaryText }}</text>
       </scroll-view>
+      <!-- 重温低语：册子足够厚时先预留一行高度（页脚不跳），文字到达后淡入；无则缺席 -->
+      <view
+        v-if="whisperSlot"
+        class="trace-page__whisper"
+        :class="{ 'trace-page__whisper--show': !!whisper }"
+      >{{ whisper }}</view>
       <!-- share-card：安静的常驻保存入口——与"‹ 回去"同级的文字样式，无按钮强调、无红点、
            无动效引导（入口永不主动弹出，红线见 share-card spec） -->
       <view class="trace-page__footer">
@@ -70,6 +76,7 @@ const SWIPE_THRESHOLD = 60
 
 import ShareCardPreview from './ShareCardPreview.vue'
 import FirstTimeHint from './FirstTimeHint.vue'
+import { getWhisperForPage, whisperPossible } from '../state/whisper.js'
 
 export default {
   name: 'TracePage',
@@ -95,6 +102,9 @@ export default {
       touchX: 0,
       touchY: 0,
       showShare: false,
+      whisper: '',
+      whisperFor: '',
+      whisperSlot: false,
     }
   },
   computed: {
@@ -120,6 +130,13 @@ export default {
     startIndex(v) {
       this.cursor = this.clampIndex(v)
     },
+    // 翻页后为新的当前页拉一句低语（安静、异步、可缺席）
+    cursor() {
+      this.loadWhisper()
+    },
+  },
+  mounted() {
+    this.loadWhisper()
   },
   methods: {
     clampIndex(i) {
@@ -127,6 +144,16 @@ export default {
       if (i < 0) return 0
       if (i >= this.pages.length) return this.pages.length - 1
       return i
+    },
+    loadWhisper() {
+      const page = this.current
+      const key = `${page.completedAt}:${page.title}`
+      this.whisper = ''
+      this.whisperFor = key
+      this.whisperSlot = whisperPossible(page)
+      getWhisperForPage(page).then((w) => {
+        if (this.whisperFor === key) this.whisper = w || ''
+      })
     },
     onTouchStart(e) {
       const t = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0])
@@ -265,5 +292,18 @@ export default {
   color: var(--c-primary);
   border-bottom: 1rpx dashed var(--c-border-s);
   padding-bottom: 4rpx;
+}
+.trace-page__whisper {
+  /* 预留一行高度：低语到达时页脚不跳，文字淡入 */
+  min-height: 44rpx;
+  font-size: 24rpx;
+  color: var(--c-subtle);
+  line-height: 1.8;
+  padding-top: 20rpx;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+.trace-page__whisper--show {
+  opacity: 1;
 }
 </style>

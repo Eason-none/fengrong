@@ -20,7 +20,8 @@
           </view>
         </view>
         <view class="collection-grid__name">{{ entry.collection.name }}</view>
-        <view v-if="entry.state.status !== 'locked'" class="collection-grid__intro">{{ entry.collection.intro }}</view>
+        <!-- 锁定卡也显示简介（降透明预览）：看不到里面是什么，用户没有理由点开 -->
+        <view class="collection-grid__intro" :class="{ 'collection-grid__intro--locked': entry.state.status === 'locked' }">{{ entry.collection.intro }}</view>
       </view>
       <view>
         <view
@@ -32,7 +33,7 @@
           ✦ 已点亮  回顾 →
         </view>
         <view v-else-if="entry.state.status === 'active'" class="collection-grid__status collection-grid__status--active">进行中</view>
-        <view v-else class="collection-grid__status">未激活</view>
+        <view v-else class="collection-grid__status">未激活 · 轻点看看</view>
       </view>
     </view>
   </view>
@@ -186,6 +187,11 @@ export default {
   font-size: 22rpx;
   color: var(--c-subtle);
   line-height: 1.65;
+}
+
+/* 锁定卡简介：降透明的预览——暗示里面有内容，又不抢激活卡的焦点 */
+.collection-grid__intro--locked {
+  opacity: 0.65;
 }
 
 /* 烫金底上的灰绿小字会发灰，换更深的中性色保证对比 */

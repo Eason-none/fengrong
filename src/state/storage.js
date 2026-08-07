@@ -17,7 +17,8 @@ export const KEYS = {
 	ANALYTICS_ANON_ID: "analyticsAnonId", // string，本地随机 UUID 上报标识——与用户任何输入/微信身份无关（spec: analytics-events）
 	ANALYTICS_QUEUE: "analyticsQueue", // 上报失败事件的有界待发队列（上限 200，超限丢最旧）
 	BREATHING_INTRO_DONE: "breathingIntroDone", // boolean，首次启动的强制呼吸引导是否已完成/跳过（breathing-entry）
-	BREATHING_AUDIO_URL: "breathingAudioUrl", // { url, expireAt }，海浪声云存储临时 URL 缓存（breathing-entry 环境音）
+	BREATHING_AUDIO_URL: "breathingAudioUrl",
+	WHISPERS: "whispers", // { [pageKey]: 低语文本 } 重温低语命中缓存（pageKey=completedAt:title）；无呼应不缓存，册子长出来后自然重试 // { url, expireAt }，海浪声云存储临时 URL 缓存（breathing-entry 环境音）
 };
 
 // ---- 照片外置层（2026-07-12，待决事项 #11 落地：微信 storage 单 key 上限约 1MB）----

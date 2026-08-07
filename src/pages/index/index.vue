@@ -67,8 +67,15 @@
           <text class="quiet-entry__icon">◡</text>
           <text class="quiet-entry__label">静一下</text>
         </view>
+        <!-- instant-entry 一次性气泡：把零决策默认起点交给新用户；与"静一下"气泡接力（它 dismiss 后才放下一个） -->
         <FirstTimeHint
-          v-if="!showBasicInfoOverlay && !showDailyCard"
+          v-if="!showBasicInfoOverlay && !showDailyCard && !instantHintSeen"
+          hint-key="instant-entry"
+          text="不想选的时候，点「现在就来一件」：随手抽一件零决策的小事，做不做、做多久都由你。"
+          @dismiss="instantHintSeen = true"
+        />
+        <FirstTimeHint
+          v-if="!showBasicInfoOverlay && !showDailyCard && instantHintSeen"
           hint-key="quiet-entry"
           text="“静一下”是一段跟着呼吸慢下来的小引导，想歇一会儿的时候可以点开。"
         />
@@ -269,6 +276,18 @@ const FLYLEAF_LINES = [
 export default {
   name: 'IndexPage',
   components: { NavBar, BreathingGuide, DailyCard, DailyTaskItem, ChatView, FirstTimeHint, TracePage, DiaryNotebook, DailyTaskFlow, InstantFlow, BasicInfoOverlay },
+  onShareAppMessage() {
+    return {
+      title: '人类丰容指北｜给生活做点丰容',
+      path: '/pages/index/index',
+      imageUrl: '/static/logo.jpg',
+    }
+  },
+  onShareTimeline() {
+    return {
+      title: '人类丰容指北｜给生活做点丰容',
+    }
+  },
   data() {
     // breathing-entry：呼吸引导只在真正的第一次启动强制出现。已持久化标记为true、或存量用户
     // 推断命中时，直接跳过——推断命中的情况顺手把标记也落盘，往后不用再推断。
@@ -310,6 +329,7 @@ export default {
       threeGoodThingsSystemPrompt: buildThreeGoodThingsSystemPrompt(),
       // 重逢弹层（trace-reencounter）：今日/昨日完成条目里有日记页的，点开展示这一页
       tracePage: null,
+      instantHintSeen: hasSeenHint('instant-entry'), // 首页 instant 气泡已读标记，用于与 quiet 气泡接力
       // 手记册（diary-notebook）：有页才出现入口，点开全屏 overlay 翻阅
       hasDiaryPages: hasAnyDiaryPage(),
       showDiaryNotebook: false,

@@ -52,6 +52,13 @@ export function getArchivedConversations() {
 		.sort((a, b) => b.archived_at - a.archived_at);
 }
 
+// 启动补扫要找回的孤儿对话：有消息但没归档——退出时的后台归档失败了，
+// 或 App 在归档跑起来前就被杀掉。这类对话没有任何界面入口能再触达，
+// 不补扫就永远沉底；归档幂等、进行中有锁，补扫重试是安全的。
+export function getStrandedConversations() {
+	return loadConversations().filter((c) => !c.archived && c.messages.length > 0);
+}
+
 // 用户选择"聊聊"才调用（跳过聊天则永远不调用本函数，AC3的前提即由此天然成立）。
 export function createConversation(completionEventId) {
 	const conversations = loadConversations();

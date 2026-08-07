@@ -44,6 +44,18 @@ function countAllReviews() {
 
 export default {
   components: { NavBar, CollectionGrid, CollectionUnlockModal, CollectionDetail, ReviewView, AllReviewsView, FirstTimeHint },
+  onShareAppMessage() {
+    return {
+      title: '人类丰容指北｜来丰容探索，给生活做点丰容',
+      path: '/pages/explore/explore',
+      imageUrl: '/static/logo.jpg',
+    }
+  },
+  onShareTimeline() {
+    return {
+      title: '人类丰容指北｜来丰容探索，给生活做点丰容',
+    }
+  },
   data() {
     return { selectedId: null, view: 'grid', activeCollectionId: null, totalReviewCount: countAllReviews() }
   },
